@@ -1,31 +1,17 @@
+// App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { AppProvider } from './contexts/AppContext';
 import { Layout } from './components/shared/Layout';
-import {
-  // LoginPage,
-  // SignupPage,
-  // ForgotPasswordPage,
-  // ResetPasswordPage,
-  DashboardPage
-  // StudentsPage,
-  // StudentPage,
-  // NewStudentPage,
-  // EditStudentPage,
-  // FeesPage,
-  // AttendancePage,
-  // AcademicCalendarPage,
-  // UsersPage,
-  // ReportsPage,
-  // SettingsPage,
-  // NotFoundPage
-} from "./pages/Dashboardpage";
-
+import { ProtectedRoute } from './components/auth/ProtectedRoute'; // Add this
+import { DashboardPage } from "./pages/Dashboardpage";
 import { StudentsPage } from "./pages/Studentspage";
 import { StudentPage } from "./pages/Studentpage";
-import {FeesPage} from "./pages/FeesPage";
+import { FeesPage } from "./pages/FeesPage";
 import { AttendancePage } from './pages/AttendancePage';
+import { LoginForm } from './components/auth/LoginForm';
+import { SignupForm } from './components/auth/SignupForm';
 
 function App() {
   return (
@@ -34,33 +20,32 @@ function App() {
         <Router>
           <Routes>
             {/* Public Routes */}
-            {/* <Route path="/login" element={<LoginPage />} /> */}
-            {/* // <Route path="/signup" element={<SignupPage />} /> */}
-            {/* // <Route path="/forgot-password" element={<ForgotPasswordPage />} /> */}
-            {/* // <Route path="/reset-password" element={<ResetPasswordPage />} /> */}
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/signup" element={<SignupForm />} />
             
-            {/* Protected Routes */}
-            <Route path="/" element={<Layout />}>
+            {/* Protected Routes - All routes under Layout */}
+            <Route 
+              path="/" 
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
               
               <Route path="students">
                 <Route index element={<StudentsPage />} />
-                {/* <Route path="new" element={<NewStudentPage />} /> */}
                 <Route path=":id" element={<StudentPage />} />
-                {/* <Route path="edit/:id" element={<EditStudentPage />} /> */}
               </Route>
               
               <Route path="fees" element={<FeesPage />} />
               <Route path="attendance" element={<AttendancePage />} />
-              {/* <Route path="academic" element={<AcademicCalendarPage />} /> */}
-              {/* <Route path="users" element={<UsersPage />} /> */}
-              {/* <Route path="reports" element={<ReportsPage />} /> */}
-              {/* <Route path="settings" element={<SettingsPage />} /> */}
             </Route>
-            
-            {/* 404 Page */}
-            {/* <Route path="*" element={<NotFoundPage />} /> */}
+
+            {/* Catch all route - redirect to login */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </Router>
       </AppProvider>

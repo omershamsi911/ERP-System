@@ -275,7 +275,7 @@ export const SignupForm = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+              <a href="login" className="font-medium text-blue-600 hover:text-blue-500">
                 Sign in
               </a>
             </p>

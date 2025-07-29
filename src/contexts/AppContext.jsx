@@ -1,14 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
-
-const AppContext = createContext();
-
-export const useApp = () => {
-  const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useApp must be used within AppProvider');
-  }
-  return context;
-};
+import React, { useState } from 'react';
+import { AppContext } from '../hooks/useApp';
 
 export const AppProvider = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

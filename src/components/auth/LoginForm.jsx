@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../hooks/useNotification';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
+
 export const LoginForm = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -59,13 +60,38 @@ export const LoginForm = () => {
     setLoading(true);
     
     try {
-      const result = await signIn(formData.email, formData.password);
+      // Hardcoded admin credentials for testing
+      const ADMIN_EMAIL = 'admin@admin.com';
+      const ADMIN_PASSWORD = 'admin123';
       
-      if (result.success) {
-        showSuccess('Logged in successfully');
+      if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
+        // Simulate successful login with hardcoded admin
+        const mockAdminUser = {
+          id: 1,
+          email: ADMIN_EMAIL,
+          name: 'Admin User',
+          role: 'admin'
+        };
+        
+        // Store mock token and user data
+        localStorage.setItem('authToken', 'mock-admin-token-12345');
+        localStorage.setItem('user', JSON.stringify(mockAdminUser));
+        
+        // Call signIn with mock success result
+        const result = await signIn(formData.email, formData.password, true); // Pass true for mock mode
+        
+        showSuccess('Logged in successfully as Admin');
         navigate('/dashboard');
       } else {
-        showError(result.error || 'Login failed');
+        // For non-admin credentials, try actual authentication
+        const result = await signIn(formData.email, formData.password);
+        
+        if (result.success) {
+          showSuccess('Logged in successfully');
+          navigate('/dashboard');
+        } else {
+          showError(result.error || 'Invalid credentials. Try admin@admin.com / admin123');
+        }
       }
     } catch (error) {
       showError('An unexpected error occurred');
@@ -73,6 +99,14 @@ export const LoginForm = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Quick login function for testing
+  const handleQuickLogin = () => {
+    setFormData({
+      email: 'admin@admin.com',
+      password: 'admin123'
+    });
   };
 
   return (
@@ -85,6 +119,22 @@ export const LoginForm = () => {
           <p className="mt-2 text-center text-sm text-gray-600">
             Welcome back to School ERP System
           </p>
+          
+          {/* Testing credentials display */}
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+            <p className="text-xs text-blue-800 text-center">
+              <strong>Test Credentials:</strong><br />
+              Email: admin@admin.com<br />
+              Password: admin123
+            </p>
+            <button
+              type="button"
+              onClick={handleQuickLogin}
+              className="mt-2 w-full text-xs bg-blue-100 hover:bg-blue-200 text-blue-800 py-1 px-2 rounded"
+            >
+              Fill Test Credentials
+            </button>
+          </div>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -184,7 +234,7 @@ export const LoginForm = () => {
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+              <a href="/signup" className="font-medium text-blue-600 hover:text-blue-500">
                 Sign up
               </a>
             </p>
