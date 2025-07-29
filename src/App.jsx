@@ -24,6 +24,7 @@ import {
 
 import { StudentsPage } from "./pages/Studentspage";
 import { StudentPage } from "./pages/Studentpage";
+import {FeesPage} from "./pages/FeesPage";
 
 function App() {
   return (
@@ -49,7 +50,7 @@ function App() {
                 {/* <Route path="edit/:id" element={<EditStudentPage />} /> */}
               </Route>
               
-              {/* <Route path="fees" element={<FeesPage />} /> */}
+              <Route path="fees" element={<FeesPage />} />
               {/* <Route path="attendance" element={<AttendancePage />} /> */}
               {/* <Route path="academic" element={<AcademicCalendarPage />} /> */}
               {/* <Route path="users" element={<UsersPage />} /> */}
