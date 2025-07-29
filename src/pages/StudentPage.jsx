@@ -4,7 +4,6 @@ import { useStudents } from '../hooks/useStudents';
 import { useFees } from '../hooks/useFees';
 import { useAttendance } from '../hooks/useAttendance';
 import { LoadingSpinner} from '../components/shared/LoadingSpinner';
-// import { ErrorAlert } from '../components/shared/ErrorAlert';
 import { DataTable } from '../components/shared/DataTable';
 import { formatDate, formatCurrency } from '../utils/helpers';
 import { FaUser, FaMoneyBill, FaCalendarAlt, FaEdit } from 'react-icons/fa';

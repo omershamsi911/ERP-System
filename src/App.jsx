@@ -3,9 +3,9 @@ import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom
 import {AuthProvider} from './contexts/AuthContext';
 import {AppProvider} from './contexts/AppContext';
 import {Layout} from './components/shared/Layout';
-import {DashboardPage} from "./pages/Dashboardpage";
-import {StudentsPage} from "./pages/Studentspage";
-import {StudentPage} from "./pages/Studentpage";
+import {DashboardPage} from "./pages/DashboardPage";
+import {StudentsPage} from "./pages/StudentsPage";
+import {StudentPage} from "./pages/StudentPage";
 import {FeesPage} from "./pages/FeesPage";
 import {AttendancePage} from './pages/AttendancePage';
 import {ReportsPage} from './pages/ReportsPage';
@@ -13,6 +13,9 @@ import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
 import {SettingsPage} from "./pages/SettingsPage";
 import {UsersPage} from "./pages/UsersPage";
 import {NotFoundPage} from "./pages/NotFoundPage";
+import {AddStudentPage} from "./pages/AddStudentPage";
+import { ViewStudentPage } from "./pages/ViewStudentPage";
+import { EditStudentPage } from "./pages/EditStudentPage";
 function App() {
   return (
     <AuthProvider>
@@ -32,8 +35,10 @@ function App() {
               
               <Route path="students">
                 <Route index element={<StudentsPage />} />
-                {/* <Route path="new" element={<NewStudentPage />} /> */}
+                <Route path="add" element={<AddStudentPage />} />
                 <Route path=":id" element={<StudentPage />} />
+                <Route path="view/:id" element={<ViewStudentPage />} />
+                <Route path="edit/:id" element={<EditStudentPage />} />
                 {/* <Route path="edit/:id" element={<EditStudentPage />} /> */}
               </Route>
               
