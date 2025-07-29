@@ -17,7 +17,7 @@ export const DashboardPage = () => {
   });
 
   const [recentActivity, setRecentActivity] = useState([]);
-  const { fetchPendingFees, pendingFees } = useFees();
+  const { fetchFees, fees } = useFees();
   const { getAttendanceSummary } = useAttendance();
   const { fetchStudents } = useStudents(); // Don't destructure `students` here
   const [loading, setLoading] = useState(true);
@@ -31,8 +31,9 @@ export const DashboardPage = () => {
         // Fetch students and use returned data directly
         const fetchedStudents = await fetchStudents();
 
-        // Fetch pending fees
-        await fetchPendingFees();
+        // Fetch fees and use the result directly
+        await fetchFees();
+        const pendingFeesList = fees || [];
 
         // Fetch attendance summary
         const currentDate = new Date();
@@ -42,7 +43,7 @@ export const DashboardPage = () => {
 
         // Calculate stats
         const activeStudents = fetchedStudents.filter(s => s.status === 'active').length;
-        const totalPending = pendingFees.reduce((sum, fee) => sum + parseFloat(fee.final_amount || 0), 0);
+        const totalPending = pendingFeesList.reduce((sum, fee) => sum + parseFloat(fee.final_amount || 0), 0);
         const attendanceRate = attendanceSummary?.data?.attendancePercentage || 0;
 
         setStats({

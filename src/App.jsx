@@ -19,6 +19,7 @@ import { EditStudentPage } from "./pages/EditStudentPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
+import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
 function App() {
   return (
     <AuthProvider>
@@ -42,6 +43,7 @@ function App() {
                       <Route path="view/:id" element={<ViewStudentPage />} />
                       <Route path="edit/:id" element={<EditStudentPage />} />
                     </Route>
+                    <Route path="ProfileSettingsPage" element={<ProfileSettingsPage/>}/>
                     <Route path="fees" element={<FeesPage />} />
                     <Route path="attendance" element={<AttendancePage />} />
                     <Route path="academic" element={<AcademicCalenderPage />} />

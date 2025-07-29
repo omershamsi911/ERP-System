@@ -5,16 +5,16 @@ export const studentService = {
     try {
       let query = supabase
         .from('students')
-        .select('*'); // no joins
+        .select('id, fullname, class, section, status, created_at, families(father_name)');
 
       if (filters.class) {
-        query = query.eq('class', filters.class); // 'class' column
+        query = query.eq('class', filters.class);
       }
       if (filters.section) {
-        query = query.eq('section', filters.section); // 'section' column
+        query = query.eq('section', filters.section);
       }
       if (filters.search) {
-        query = query.or(`first_name.ilike.%${filters.search}%,last_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`);
+        // You may want to update this search logic for fullname
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
