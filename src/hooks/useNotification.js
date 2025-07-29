@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useApp } from '../contexts/AppContext';
+import { useState, useCallback } from 'react';
+import { useApp } from './useApp';
 
 export const useNotification = () => {
   const { addNotification, removeNotification, clearNotifications, notifications } = useApp();
