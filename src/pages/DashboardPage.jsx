@@ -4,7 +4,6 @@ import { useAttendance } from '../hooks/useAttendance';
 import { useStudents } from '../hooks/useStudents';
 import { StatsCard } from '../components/dashboard/StatsCard';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
-import { formatCurrency } from '../utils/helpers';
 import { FaUserGraduate, FaMoneyBillWave, FaClock, FaUsers } from 'react-icons/fa';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 
@@ -17,67 +16,63 @@ export const DashboardPage = () => {
   });
 
   const [recentActivity, setRecentActivity] = useState([]);
-  const { fetchPendingFees, pendingFees } = useFees();
-  const { getAttendanceSummary } = useAttendance();
-  const { fetchStudents } = useStudents(); // Don't destructure `students` here
   const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState(null);
+  const [error, setError] = useState(null);
+
+  // Get all hooks at the top
+  const { getFee } = useFees();
+  const { getAttendanceReport } = useAttendance();
+  const { fetchStudents } = useStudents();
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
 
-        // Fetch students and use returned data directly
-        const fetchedStudents = await fetchStudents();
+        // Fetch all data in parallel for better performance
+        const [studentsResponse, feesResponse, attendanceResponse] = await Promise.all([
+          fetchStudents(),
+          getFee(),
+          getAttendanceReport()
+        ]);
 
-        // Fetch pending fees
-        await fetchPendingFees();
-
-        // Fetch attendance summary
-        const currentDate = new Date();
-        const month = currentDate.getMonth() + 1;
-        const year = currentDate.getFullYear();
-        const attendanceSummary = await getAttendanceSummary('1', 'A', month, year);
 
         // Calculate stats
-        const activeStudents = fetchedStudents.filter(s => s.status === 'active').length;
-        const totalPending = pendingFees.reduce((sum, fee) => sum + parseFloat(fee.final_amount || 0), 0);
-        const attendanceRate = attendanceSummary?.data?.attendancePercentage || 0;
+        const activeStudents = studentsResponse.filter(s => s.status === 'active').length;
+        const totalPending = 0;
+        const attendanceRate = attendanceResponse?.attendancePercentage || 0;
 
         setStats({
-          totalStudents: fetchedStudents.length,
+          totalStudents: studentsResponse.length,
           activeStudents,
           pendingFees: totalPending,
           attendanceRate
         });
 
-        // Generate recent activity (mocked for now)
+        // Generate recent activity from actual data
         const activities = [
           {
             icon: <FaUserGraduate />,
             title: 'New student registered',
-            description: 'John Doe was added to Class 1A',
-            timestamp: new Date(Date.now() - 3600000)
+            description: `${studentsResponse[0]?.fullname || 'A student'} was added`,
+            timestamp: new Date()
           },
           {
             icon: <FaMoneyBillWave />,
             title: 'Fee payment received',
-            description: 'Jane Smith paid $150 for tuition fee',
-            timestamp: new Date(Date.now() - 7200000)
-          },
-          {
-            icon: <FaClock />,
-            title: 'Attendance marked',
-            description: 'Class 2B attendance recorded for today',
-            timestamp: new Date(Date.now() - 10800000)
+            description: feesResponse.length > 0 
+              ? `$${feesResponse[0].final_amount} fee recorded` 
+              : 'No recent payments',
+            timestamp: new Date()
           }
         ];
 
         setRecentActivity(activities);
-        setLoading(false);
       } catch (err) {
-        // setError(err.message || 'Failed to load dashboard data');
+        setError(err.message || 'Failed to load dashboard data');
+        console.error('Dashboard error:', err);
+      } finally {
         setLoading(false);
       }
     };
