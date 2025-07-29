@@ -13,7 +13,7 @@ import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
 import {SettingsPage} from "./pages/SettingsPage";
 import {UsersPage} from "./pages/UsersPage";
 import {NotFoundPage} from "./pages/NotFoundPage";
-import {AddStudentPage} from "./pages/AddStudentPage";
+import AddStudentPage from "./pages/AddStudentPage";
 import { ViewStudentPage } from "./pages/ViewStudentPage";
 import { EditStudentPage } from "./pages/EditStudentPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";

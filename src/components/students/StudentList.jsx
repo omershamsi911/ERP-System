@@ -1,18 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DataTable } from '../shared/DataTable';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 import { useStudents } from '../../hooks/useStudents';
 import { useNotification } from '../../hooks/useNotification';
+import { supabase } from '../../services/supabase';
 
 export const StudentList = () => {
-  const { students, loading, error, deleteStudent } = useStudents();
+  const { students, loading, error, deleteStudent, updateStudent } = useStudents();
   const { showSuccess, showError } = useNotification();
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [editingStudent, setEditingStudent] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [families, setFamilies] = useState([]);
+  const [loadingUpdate, setLoadingUpdate] = useState(false);
+
+  // Fetch families for the dropdown
+  useEffect(() => {
+    const fetchFamilies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('families')
+          .select('id, father_name, family_name')
+          .order('father_name');
+        
+        if (error) throw error;
+        setFamilies(data || []);
+      } catch (error) {
+        console.error('Error fetching families:', error);
+      }
+    };
+
+    fetchFamilies();
+  }, []);
 
   const handleDelete = async (studentId) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
+        setLoadingUpdate(true);
+        
+        // Delete from Supabase
+        const { error } = await supabase
+          .from('students')
+          .delete()
+          .eq('id', studentId);
+
+        if (error) throw error;
+
+        // Update local state or refetch
         const result = await deleteStudent(studentId);
         if (result.success) {
           showSuccess('Student deleted successfully');
@@ -20,7 +55,10 @@ export const StudentList = () => {
           showError(result.error || 'Failed to delete student');
         }
       } catch (error) {
+        console.error('Error deleting student:', error);
         showError('An error occurred while deleting the student');
+      } finally {
+        setLoadingUpdate(false);
       }
     }
   };
@@ -33,14 +71,141 @@ export const StudentList = () => {
 
     if (window.confirm(`Are you sure you want to delete ${selectedStudents.length} students?`)) {
       try {
+        setLoadingUpdate(true);
+        
+        // Delete from Supabase
+        const { error } = await supabase
+          .from('students')
+          .delete()
+          .in('id', selectedStudents);
+
+        if (error) throw error;
+
+        // Update local state
         const deletePromises = selectedStudents.map(id => deleteStudent(id));
         await Promise.all(deletePromises);
         setSelectedStudents([]);
         showSuccess(`${selectedStudents.length} students deleted successfully`);
       } catch (error) {
+        console.error('Error deleting students:', error);
         showError('An error occurred while deleting students');
+      } finally {
+        setLoadingUpdate(false);
       }
     }
+  };
+
+  const handleEditClick = (student) => {
+    setEditingStudent(student.id);
+    setEditFormData({
+      fullname: student.fullname,
+      dob: student.dob,
+      family_id: student.family_id,
+      admission_date: student.admission_date,
+      gr_number: student.gr_number,
+      class: student.class,
+      section: student.section,
+      status: student.status
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingStudent(null);
+    setEditFormData({});
+  };
+
+  const handleEditSave = async (studentId) => {
+    try {
+      setLoadingUpdate(true);
+      
+      // Update in Supabase
+      const { data, error } = await supabase
+        .from('students')
+        .update(editFormData)
+        .eq('id', studentId)
+        .select(`
+          *,
+          families (
+            id,
+            father_name,
+            family_name,
+            contact_number,
+            email,
+            address
+          )
+        `)
+        .single();
+
+      if (error) throw error;
+
+      // Update local state
+      const result = await updateStudent(studentId, editFormData);
+      if (result.success) {
+        showSuccess('Student updated successfully');
+        setEditingStudent(null);
+        setEditFormData({});
+      } else {
+        showError(result.error || 'Failed to update student');
+      }
+    } catch (error) {
+      console.error('Error updating student:', error);
+      showError('An error occurred while updating the student');
+    } finally {
+      setLoadingUpdate(false);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const renderEditableCell = (value, field, studentId, type = 'text', options = null) => {
+    if (editingStudent === studentId) {
+      if (type === 'select') {
+        return (
+          <select
+            value={editFormData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {options.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+      } else if (type === 'family_select') {
+        return (
+          <select
+            value={editFormData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select Family</option>
+            {families.map(family => (
+              <option key={family.id} value={family.id}>
+                {family.father_name} ({family.family_name})
+              </option>
+            ))}
+          </select>
+        );
+      } else {
+        return (
+          <input
+            type={type}
+            value={editFormData[field] || ''}
+            onChange={(e) => handleInputChange(field, e.target.value)}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        );
+      }
+    }
+    
+    return <span className="text-sm text-gray-900">{value}</span>;
   };
 
   const columns = [
@@ -56,57 +221,104 @@ export const StudentList = () => {
       key: 'fullname',
       label: 'Name',
       sortable: true,
-      render: (value) => (
-        <span className="text-sm font-medium text-gray-900">{value}</span>
+      render: (value, row) => (
+        <div className="text-sm font-medium text-gray-900">
+          {renderEditableCell(value, 'fullname', row.id)}
+        </div>
+      )
+    },
+    {
+      key: 'dob',
+      label: 'Date of Birth',
+      sortable: true,
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {editingStudent === row.id ? 
+            renderEditableCell(value, 'dob', row.id, 'date') :
+            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
+          }
+        </div>
+      )
+    },
+    {
+      key: 'gr_number',
+      label: 'GR Number',
+      sortable: true,
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {renderEditableCell(value || 'N/A', 'gr_number', row.id)}
+        </div>
       )
     },
     {
       key: 'class',
       label: 'Class',
       sortable: true,
-      render: (value) => (
-        <span className="text-sm text-gray-900">{value}</span>
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {renderEditableCell(value, 'class', row.id)}
+        </div>
       )
     },
     {
       key: 'section',
       label: 'Section',
       sortable: true,
-      render: (value) => (
-        <span className="text-sm text-gray-900">{value}</span>
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {renderEditableCell(value, 'section', row.id)}
+        </div>
       )
     },
     {
       key: 'status',
       label: 'Status',
       sortable: true,
-      render: (value) => (
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          value === 'active' 
-            ? 'bg-green-100 text-green-800' 
-            : value === 'inactive'
-            ? 'bg-red-100 text-red-800'
-            : 'bg-gray-100 text-gray-800'
-        }`}>
-          {value}
-        </span>
-      )
+      render: (value, row) => {
+        if (editingStudent === row.id) {
+          return renderEditableCell(value, 'status', row.id, 'select', [
+            { value: 'active', label: 'Active' },
+            { value: 'inactive', label: 'Inactive' },
+            { value: 'pending', label: 'Pending' }
+          ]);
+        }
+        
+        return (
+          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+            value === 'active' 
+              ? 'bg-green-100 text-green-800' 
+              : value === 'inactive'
+              ? 'bg-red-100 text-red-800'
+              : 'bg-gray-100 text-gray-800'
+          }`}>
+            {value}
+          </span>
+        );
+      }
     },
     {
-      key: 'created_at',
-      label: 'Joined',
+      key: 'admission_date',
+      label: 'Admission Date',
       sortable: true,
-      render: (value) => (
-        <span className="text-sm text-gray-500">{new Date(value).toLocaleDateString()}</span>
+      render: (value, row) => (
+        <div className="text-sm text-gray-500">
+          {editingStudent === row.id ? 
+            renderEditableCell(value, 'admission_date', row.id, 'date') :
+            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
+          }
+        </div>
       )
     },
     {
       key: 'families',
       label: "Father's Name",
       sortable: false,
-      render: (value) => (
-        <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>
-      )
+      render: (value, row) => {
+        if (editingStudent === row.id) {
+          return renderEditableCell(value?.father_name || 'N/A', 'family_id', row.id, 'family_select');
+        }
+        return <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>;
+      }
     },
     {
       key: 'actions',
@@ -114,24 +326,47 @@ export const StudentList = () => {
       sortable: false,
       render: (value, row) => (
         <div className="flex items-center space-x-2">
-          <Link
-            to={`/students/view/${row.id}`}
-            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-          >
-            View
-          </Link>
-          <Link
-            to={`/students/edit/${row.id}`}
-            className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-          >
-            Edit
-          </Link>
-          <button
-            onClick={() => handleDelete(row.id)}
-            className="text-red-600 hover:text-red-900 text-sm font-medium"
-          >
-            Delete
-          </button>
+          {editingStudent === row.id ? (
+            <>
+              <button
+                onClick={() => handleEditSave(row.id)}
+                disabled={loadingUpdate}
+                className="text-green-600 hover:text-green-900 text-sm font-medium disabled:opacity-50"
+              >
+                {loadingUpdate ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={handleEditCancel}
+                disabled={loadingUpdate}
+                className="text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to={`/students/view/${row.id}`}
+                className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+              >
+                View
+              </Link>
+              <button
+                onClick={() => handleEditClick(row)}
+                disabled={loadingUpdate || editingStudent !== null}
+                className="text-indigo-600 hover:text-indigo-900 text-sm font-medium disabled:opacity-50"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(row.id)}
+                disabled={loadingUpdate || editingStudent !== null}
+                className="text-red-600 hover:text-red-900 text-sm font-medium disabled:opacity-50"
+              >
+                {loadingUpdate ? 'Deleting...' : 'Delete'}
+              </button>
+            </>
+          )}
         </div>
       )
     }
@@ -181,9 +416,10 @@ export const StudentList = () => {
           {selectedStudents.length > 0 && (
             <button
               onClick={handleBulkDelete}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              disabled={loadingUpdate || editingStudent !== null}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             >
-              Delete Selected ({selectedStudents.length})
+              {loadingUpdate ? 'Deleting...' : `Delete Selected (${selectedStudents.length})`}
             </button>
           )}
           <Link
@@ -194,6 +430,16 @@ export const StudentList = () => {
           </Link>
         </div>
       </div>
+
+      {/* Loading overlay for updates */}
+      {loadingUpdate && (
+        <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-3">
+            <LoadingSpinner size="small" />
+            <span className="text-sm text-gray-700">Updating...</span>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -308,12 +554,14 @@ export const StudentList = () => {
         pagination={true}
         itemsPerPage={10}
         onRowClick={(row) => {
-          // Handle row selection for bulk operations
-          setSelectedStudents(prev => 
-            prev.includes(row.id) 
-              ? prev.filter(id => id !== row.id)
-              : [...prev, row.id]
-          );
+          // Only allow row selection if not editing
+          if (editingStudent === null) {
+            setSelectedStudents(prev => 
+              prev.includes(row.id) 
+                ? prev.filter(id => id !== row.id)
+                : [...prev, row.id]
+            );
+          }
         }}
       />
     </div>
