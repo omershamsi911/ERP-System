@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../../hooks/useAuth';
 import { useAuth } from '../../hooks/useAuth';
+import { Navigate } from 'react-router-dom'; 
 
 // Auth Provider Component
 export const AuthProvider = ({ children }) => {
@@ -87,9 +88,8 @@ export const ProtectedRoute = ({ children, redirectTo = '/login' }) => {
   }
 
   if (!isAuthenticated) {
-    // Redirect to login page
-    window.location.href = redirectTo;
-    return null;
+    // Use Navigate for client-side redirection
+    return <Navigate to={redirectTo} replace />;
   }
 
   return children;

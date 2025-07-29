@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotification } from '../../hooks/useNotification';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
-
+import { Navigate } from 'react-router-dom';
 
 export const LoginForm = () => {
   const [formData, setFormData] = useState({
@@ -13,7 +13,7 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const { signIn } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, signIn } = useAuth();
   const { showError, showSuccess } = useNotification();
   const navigate = useNavigate();
 
@@ -32,6 +32,19 @@ export const LoginForm = () => {
       }));
     }
   };
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Show loading spinner during auth check
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="large" />
+      </div>
+    );
+  }
 
   const validateForm = () => {
     const newErrors = {};
