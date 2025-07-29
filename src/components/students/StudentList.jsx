@@ -49,49 +49,31 @@ export const StudentList = () => {
       label: 'ID',
       sortable: true,
       render: (value) => (
-        <span className="text-sm font-medium text-gray-900">#{value}</span>
+        <span className="text-sm font-medium text-gray-900">{value.slice(0, 8)}</span>
       )
     },
     {
-      key: 'first_name',
+      key: 'fullname',
       label: 'Name',
       sortable: true,
-      render: (value, row) => (
-        <div className="flex items-center">
-          <div className="flex-shrink-0 h-10 w-10">
-            <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
-                {row.first_name?.[0]}{row.last_name?.[0]}
-              </span>
-            </div>
-          </div>
-          <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">
-              {row.first_name} {row.last_name}
-            </div>
-            <div className="text-sm text-gray-500">{row.email}</div>
-          </div>
-        </div>
+      render: (value) => (
+        <span className="text-sm font-medium text-gray-900">{value}</span>
       )
     },
     {
       key: 'class',
       label: 'Class',
       sortable: true,
-      render: (value, row) => (
-        <div className="text-sm text-gray-900">
-          {row.class?.name || 'N/A'}
-        </div>
+      render: (value) => (
+        <span className="text-sm text-gray-900">{value}</span>
       )
     },
     {
       key: 'section',
       label: 'Section',
       sortable: true,
-      render: (value, row) => (
-        <div className="text-sm text-gray-900">
-          {row.section?.name || 'N/A'}
-        </div>
+      render: (value) => (
+        <span className="text-sm text-gray-900">{value}</span>
       )
     },
     {
@@ -115,9 +97,15 @@ export const StudentList = () => {
       label: 'Joined',
       sortable: true,
       render: (value) => (
-        <div className="text-sm text-gray-500">
-          {new Date(value).toLocaleDateString()}
-        </div>
+        <span className="text-sm text-gray-500">{new Date(value).toLocaleDateString()}</span>
+      )
+    },
+    {
+      key: 'families',
+      label: "Father's Name",
+      sortable: false,
+      render: (value) => (
+        <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>
       )
     },
     {

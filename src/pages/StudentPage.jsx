@@ -94,7 +94,14 @@ export const StudentPage = () => {
           <div className="bg-gray-200 border-2 border-dashed rounded-xl w-16 h-16 mr-4" />
           <div>
             <h1 className="text-2xl font-bold">{student.fullname}</h1>
-            <p className="text-gray-300">{student.class} - {student.section} | GR: {student.gr_number}</p>
+            <div className="flex flex-wrap gap-4 mt-2">
+              <span className="bg-gray-700 px-2 py-1 rounded text-xs">ID: {student.id.slice(0, 16)}</span>
+              <span className="bg-blue-700 px-2 py-1 rounded text-xs">Class: {student.class}</span>
+              <span className="bg-green-700 px-2 py-1 rounded text-xs">Section: {student.section}</span>
+              <span className="bg-purple-700 px-2 py-1 rounded text-xs">Status: {student.status}</span>
+              <span className="bg-yellow-700 px-2 py-1 rounded text-xs">Joined: {formatDate(student.created_at)}</span>
+              <span className="bg-pink-700 px-2 py-1 rounded text-xs">Father: {student.families?.father_name || 'N/A'}</span>
+            </div>
           </div>
         </div>
         <Link 

@@ -30,7 +30,7 @@ export const studentService = {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('*') // no joins
+        .select('id, fullname, class, section, status, gr_number, created_at, family_id, families(father_name)')
         .eq('id', id)
         .single();
 
