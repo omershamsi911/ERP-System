@@ -22,11 +22,6 @@ function App() {
       <AppProvider>
         <Router>
           <Routes>
-            {/* Public Routes */}
-            {/* <Route path="/login" element={<LoginPage />} /> */}
-            {/* // <Route path="/signup" element={<SignupPage />} /> */}
-            {/* // <Route path="/forgot-password" element={<ForgotPasswordPage />} /> */}
-            {/* // <Route path="/reset-password" element={<ResetPasswordPage />} /> */}
             
             {/* Protected Routes */}
             <Route path="/" element={<Layout />}>
@@ -39,7 +34,6 @@ function App() {
                 <Route path=":id" element={<StudentPage />} />
                 <Route path="view/:id" element={<ViewStudentPage />} />
                 <Route path="edit/:id" element={<EditStudentPage />} />
-                {/* <Route path="edit/:id" element={<EditStudentPage />} /> */}
               </Route>
               
               <Route path="fees" element={<FeesPage />} />
