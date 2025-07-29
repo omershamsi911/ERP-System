@@ -1,63 +1,121 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStudents } from '../hooks/useStudents';
+import { supabase } from '../services/supabase';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { formatDateForInput } from '../utils/helpers';
 
 const AddStudentPage = () => {
-  const { createStudent, loading, error } = useStudents();
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   
-  // Form state
+  // Form state with separated student and family data
   const [formData, setFormData] = useState({
-    fullname: '',
-    gr_number: '',
-    class: '',
-    section: '',
-    dob: '',
-    admission_date: formatDateForInput(new Date()),
-    status: 'active',
-    email: '',
-    contact_number: ''
+    student: {
+      fullname: '',
+      gr_number: '',
+      class: '',
+      section: '',
+      dob: '',
+      admission_date: formatDateForInput(new Date()),
+      status: 'active',
+    },
+    family: {
+      father_name: '',
+      family_name: '',
+      contact_number: '',
+      email: '',
+      address: ''
+    }
   });
   
   const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const [section, field] = name.split('.');
+    
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value
+      }
+    }));
     
     // Clear error when field changes
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: null }));
+    if (errors[section]?.[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: null
+        }
+      }));
     }
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const newErrors = {
+      student: {},
+      family: {}
+    };
     
-    if (!formData.fullname.trim()) newErrors.fullname = 'Full name is required';
-    if (!formData.gr_number.trim()) newErrors.gr_number = 'GR Number is required';
-    if (!formData.class) newErrors.class = 'Class is required';
-    if (!formData.section) newErrors.section = 'Section is required';
-    if (!formData.dob) newErrors.dob = 'Date of birth is required';
+    // Student validations
+    if (!formData.student.fullname.trim()) newErrors.student.fullname = 'Full name is required';
+    if (!formData.student.gr_number.trim()) newErrors.student.gr_number = 'GR Number is required';
+    if (!formData.student.class) newErrors.student.class = 'Class is required';
+    if (!formData.student.section) newErrors.student.section = 'Section is required';
+    if (!formData.student.dob) newErrors.student.dob = 'Date of birth is required';
+    
+    // Family validations
+    if (!formData.family.father_name.trim()) newErrors.family.father_name = "Father's name is required";
+    if (!formData.family.family_name.trim()) newErrors.family.family_name = 'Family name is required';
+    if (!formData.family.contact_number.trim()) newErrors.family.contact_number = 'Contact number is required';
+    if (!formData.family.address.trim()) newErrors.family.address = 'Address is required';
     
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    return (
+      Object.keys(newErrors.student).length === 0 && 
+      Object.keys(newErrors.family).length === 0
+    );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) return;
     
+    setLoading(true);
+    setError(null);
+    
     try {
-      const result = await createStudent(formData);
-      if (result.success) {
-        navigate(`/students/${result.data.id}`);
-      }
+      // 1. Create family
+      const { data: family, error: familyError } = await supabase
+        .from('families')
+        .insert([formData.family])
+        .select()
+        .single();
+      
+      if (familyError) throw familyError;
+      
+      // 2. Create student
+      const { error: studentError } = await supabase
+        .from('students')
+        .insert([{
+          ...formData.student,
+          family_id: family.id,
+          is_eldest: true // First student in family is eldest
+        }]);
+      
+      if (studentError) throw studentError;
+      
+      navigate('/students');
     } catch (err) {
-      console.error('Failed to create student:', err);
+      setError(err.message || 'An error occurred');
+      console.error('Submission error:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,7 +140,7 @@ const AddStudentPage = () => {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Personal Info Section */}
         <div className="border-b border-gray-200 pb-6">
-          <h2 className="text-lg font-semibold mb-4">Personal Information</h2>
+          <h2 className="text-lg font-semibold mb-4">Student Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -90,15 +148,15 @@ const AddStudentPage = () => {
               </label>
               <input
                 type="text"
-                name="fullname"
-                value={formData.fullname}
+                name="student.fullname"
+                value={formData.student.fullname}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 border rounded-md ${
-                  errors.fullname ? 'border-red-500' : 'border-gray-300'
+                  errors.student?.fullname ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
-              {errors.fullname && (
-                <p className="mt-1 text-sm text-red-600">{errors.fullname}</p>
+              {errors.student?.fullname && (
+                <p className="mt-1 text-sm text-red-600">{errors.student.fullname}</p>
               )}
             </div>
 
@@ -108,15 +166,15 @@ const AddStudentPage = () => {
               </label>
               <input
                 type="text"
-                name="gr_number"
-                value={formData.gr_number}
+                name="student.gr_number"
+                value={formData.student.gr_number}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 border rounded-md ${
-                  errors.gr_number ? 'border-red-500' : 'border-gray-300'
+                  errors.student?.gr_number ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
-              {errors.gr_number && (
-                <p className="mt-1 text-sm text-red-600">{errors.gr_number}</p>
+              {errors.student?.gr_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.student.gr_number}</p>
               )}
             </div>
 
@@ -125,11 +183,11 @@ const AddStudentPage = () => {
                 Class *
               </label>
               <select
-                name="class"
-                value={formData.class}
+                name="student.class"
+                value={formData.student.class}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 border rounded-md ${
-                  errors.class ? 'border-red-500' : 'border-gray-300'
+                  errors.student?.class ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
                 <option value="">Select Class</option>
@@ -139,8 +197,8 @@ const AddStudentPage = () => {
                   </option>
                 ))}
               </select>
-              {errors.class && (
-                <p className="mt-1 text-sm text-red-600">{errors.class}</p>
+              {errors.student?.class && (
+                <p className="mt-1 text-sm text-red-600">{errors.student.class}</p>
               )}
             </div>
 
@@ -149,11 +207,11 @@ const AddStudentPage = () => {
                 Section *
               </label>
               <select
-                name="section"
-                value={formData.section}
+                name="student.section"
+                value={formData.student.section}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 border rounded-md ${
-                  errors.section ? 'border-red-500' : 'border-gray-300'
+                  errors.student?.section ? 'border-red-500' : 'border-gray-300'
                 }`}
               >
                 <option value="">Select Section</option>
@@ -163,8 +221,8 @@ const AddStudentPage = () => {
                   </option>
                 ))}
               </select>
-              {errors.section && (
-                <p className="mt-1 text-sm text-red-600">{errors.section}</p>
+              {errors.student?.section && (
+                <p className="mt-1 text-sm text-red-600">{errors.student.section}</p>
               )}
             </div>
 
@@ -174,15 +232,15 @@ const AddStudentPage = () => {
               </label>
               <input
                 type="date"
-                name="dob"
-                value={formData.dob}
+                name="student.dob"
+                value={formData.student.dob}
                 onChange={handleChange}
                 className={`w-full px-3 py-2 border rounded-md ${
-                  errors.dob ? 'border-red-500' : 'border-gray-300'
+                  errors.student?.dob ? 'border-red-500' : 'border-gray-300'
                 }`}
               />
-              {errors.dob && (
-                <p className="mt-1 text-sm text-red-600">{errors.dob}</p>
+              {errors.student?.dob && (
+                <p className="mt-1 text-sm text-red-600">{errors.student.dob}</p>
               )}
             </div>
 
@@ -192,8 +250,8 @@ const AddStudentPage = () => {
               </label>
               <input
                 type="date"
-                name="admission_date"
-                value={formData.admission_date}
+                name="student.admission_date"
+                value={formData.student.admission_date}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
@@ -201,49 +259,108 @@ const AddStudentPage = () => {
           </div>
         </div>
 
-        {/* Contact Info Section */}
+        {/* Family Info Section */}
         <div className="border-b border-gray-200 pb-6">
-          <h2 className="text-lg font-semibold mb-4">Contact Information</h2>
+          <h2 className="text-lg font-semibold mb-4">Family Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Father's Name *
+              </label>
+              <input
+                type="text"
+                name="family.father_name"
+                value={formData.family.father_name}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border rounded-md ${
+                  errors.family?.father_name ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors.family?.father_name && (
+                <p className="mt-1 text-sm text-red-600">{errors.family.father_name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Family Name *
+              </label>
+              <input
+                type="text"
+                name="family.family_name"
+                value={formData.family.family_name}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border rounded-md ${
+                  errors.family?.family_name ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors.family?.family_name && (
+                <p className="mt-1 text-sm text-red-600">{errors.family.family_name}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Number *
+              </label>
+              <input
+                type="tel"
+                name="family.contact_number"
+                value={formData.family.contact_number}
+                onChange={handleChange}
+                className={`w-full px-3 py-2 border rounded-md ${
+                  errors.family?.contact_number ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors.family?.contact_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.family.contact_number}</p>
+              )}
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Email
               </label>
               <input
                 type="email"
-                name="email"
-                value={formData.email}
+                name="family.email"
+                value={formData.family.email}
                 onChange={handleChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
 
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Number
+                Address *
               </label>
-              <input
-                type="tel"
-                name="contact_number"
-                value={formData.contact_number}
+              <textarea
+                name="family.address"
+                value={formData.family.address}
                 onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              />
+                rows="3"
+                className={`w-full px-3 py-2 border rounded-md ${
+                  errors.family?.address ? 'border-red-500' : 'border-gray-300'
+                }`}
+              ></textarea>
+              {errors.family?.address && (
+                <p className="mt-1 text-sm text-red-600">{errors.family.address}</p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Status Section */}
         <div className="pb-6">
-          <h2 className="text-lg font-semibold mb-4">Status</h2>
+          <h2 className="text-lg font-semibold mb-4">Student Status</h2>
           <div className="flex items-center space-x-4">
             {['active', 'inactive'].map((status) => (
               <label key={status} className="flex items-center">
                 <input
                   type="radio"
-                  name="status"
+                  name="student.status"
                   value={status}
-                  checked={formData.status === status}
+                  checked={formData.student.status === status}
                   onChange={handleChange}
                   className="h-4 w-4 text-blue-600"
                 />
@@ -276,4 +393,3 @@ const AddStudentPage = () => {
 };
 
 export default AddStudentPage;
-export { AddStudentPage };
