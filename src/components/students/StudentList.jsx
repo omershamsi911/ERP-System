@@ -127,7 +127,7 @@ export const StudentList = () => {
       render: (value, row) => (
         <div className="flex items-center space-x-2">
           <Link
-            to={`/students/${row.id}`}
+            to={`/students/view/${row.id}`}
             className="text-blue-600 hover:text-blue-900 text-sm font-medium"
           >
             View
