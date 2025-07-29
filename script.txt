@@ -366,4 +366,63 @@ INSERT INTO fee_types (name, description) VALUES
 -- Success message
 SELECT 'Database schema created successfully! All tables, indexes, and sample data have been set up.' as status;
 
-Syed Omer Ahmed Shamsi
+================ Performance Module =======================
+
+create table exams (
+  id uuid primary key default uuid_generate_v4(),
+  term_details_id uuid references term_details(id) on delete cascade,
+  student_id uuid references students(id) on delete cascade,
+  exam_type varchar(50) not null,
+  subject varchar(100) not null,
+  total_marks int not null,
+  percentage float,
+  grade varchar(3),
+  marks_obtained float,
+  created_at timestamp with time zone default NOW()
+);
+
+create table rechecking_schedule (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  subjects varchar(100),
+  completeness int,
+  accuracy int,
+  clarity int,
+  feedback int,
+  presentation int
+);
+
+create table student_progress_report (
+  id uuid primary key default uuid_generate_v4(),
+  date date not null,
+  day varchar(20),
+  student_id uuid references students(id) on delete cascade,
+  attendance_id uuid references attendance_student(id) on delete cascade,
+  uniform_compliance varchar(50),
+  homework_completion varchar(50),
+  class_discipline varchar(50),
+  class_work varchar(50),
+  punctuality varchar(50),
+  class_participation varchar(50),
+  behavior varchar(50)
+);
+
+create table quiz (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  subject varchar(50),
+  cp varchar(50),
+  rubric int,
+  date date
+);
+
+create table performance (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  exam_id uuid references exams(id) on delete cascade,
+  copy_check_id uuid references rechecking_schedule(id) on delete cascade,
+  student_progress_report_id uuid references student_progress_report(id) on delete cascade,
+  quiz_id uuid references quiz(id) on delete cascade
+);
+
+
