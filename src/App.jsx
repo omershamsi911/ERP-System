@@ -1,32 +1,18 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
-import { AppProvider } from './contexts/AppContext';
-import { Layout } from './components/shared/Layout';
-import {
-  // LoginPage,
-  // SignupPage,
-  // ForgotPasswordPage,
-  // ResetPasswordPage,
-  DashboardPage
-  // StudentsPage,
-  // StudentPage,
-  // NewStudentPage,
-  // EditStudentPage,
-  // FeesPage,
-  // AttendancePage,
-  // AcademicCalendarPage,
-  // UsersPage,
-  // ReportsPage,
-  // SettingsPage,
-  // NotFoundPage
-} from "./pages/Dashboardpage";
-
-import { StudentsPage } from "./pages/Studentspage";
-import { StudentPage } from "./pages/Studentpage";
+import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
+import {AuthProvider} from './contexts/AuthContext';
+import {AppProvider} from './contexts/AppContext';
+import {Layout} from './components/shared/Layout';
+import {DashboardPage} from "./pages/Dashboardpage";
+import {StudentsPage} from "./pages/Studentspage";
+import {StudentPage} from "./pages/Studentpage";
 import {FeesPage} from "./pages/FeesPage";
-import { AttendancePage } from './pages/AttendancePage';
-
+import {AttendancePage} from './pages/AttendancePage';
+import {ReportsPage} from './pages/ReportsPage';
+import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
+import {SettingsPage} from "./pages/SettingsPage";
+import {UsersPage} from "./pages/UsersPage";
+import {NotFoundPage} from "./pages/NotFoundPage";
 function App() {
   return (
     <AuthProvider>
@@ -53,14 +39,12 @@ function App() {
               
               <Route path="fees" element={<FeesPage />} />
               <Route path="attendance" element={<AttendancePage />} />
-              {/* <Route path="academic" element={<AcademicCalendarPage />} /> */}
-              {/* <Route path="users" element={<UsersPage />} /> */}
-              {/* <Route path="reports" element={<ReportsPage />} /> */}
-              {/* <Route path="settings" element={<SettingsPage />} /> */}
+              <Route path="academic" element={<AcademicCalenderPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
-            
-            {/* 404 Page */}
-            {/* <Route path="*" element={<NotFoundPage />} /> */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Router>
       </AppProvider>
