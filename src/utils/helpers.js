@@ -303,15 +303,3 @@ export const setQueryParams = (params, url = window.location.href) => {
   });
   return urlObj.toString();
 };
-
-
-
-// Add this function to your existing helpers
-export const formatDateForInput = (date) => {
-  if (!date) return '';
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = `${d.getMonth() + 1}`.padStart(2, '0');
-  const day = `${d.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
