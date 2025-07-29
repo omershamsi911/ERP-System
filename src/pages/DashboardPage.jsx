@@ -16,6 +16,9 @@ export const DashboardPage = () => {
   });
 
   const [recentActivity, setRecentActivity] = useState([]);
+  const { fetchPendingFees, pendingFees } = useFees();
+  const { getAttendanceSummary } = useAttendance();
+  const { fetchStudents } = useStudents(); // Don't destructure `students` here
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -28,20 +31,23 @@ export const DashboardPage = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        // Fetch all data in parallel for better performance
-        const [studentsResponse, feesResponse, attendanceResponse] = await Promise.all([
-          fetchStudents(),
-          getFee(),
-          getAttendanceReport()
-        ]);
+        // Fetch students and use returned data directly
+        const fetchedStudents = await fetchStudents();
 
+        // Fetch pending fees
+        await fetchPendingFees();
+
+        // Fetch attendance summary
+        const currentDate = new Date();
+        const month = currentDate.getMonth() + 1;
+        const year = currentDate.getFullYear();
+        const attendanceSummary = await getAttendanceSummary('1', 'A', month, year);
 
         // Calculate stats
-        const activeStudents = studentsResponse.filter(s => s.status === 'active').length;
-        const totalPending = 0;
-        const attendanceRate = attendanceResponse?.attendancePercentage || 0;
+        const activeStudents = fetchedStudents.filter(s => s.status === 'active').length;
+        const totalPending = pendingFees.reduce((sum, fee) => sum + parseFloat(fee.final_amount || 0), 0);
+        const attendanceRate = attendanceSummary?.data?.attendancePercentage || 0;
 
         setStats({
           totalStudents: studentsResponse.length,

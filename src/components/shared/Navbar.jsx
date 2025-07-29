@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { LoadingSpinner } from './LoadingSpinner';
+import { Navigate, useNavigate } from 'react-router-dom';
+
 
 export const Navbar = ({ profile }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { signOut } = useAuth();
-
+  const navigate = useNavigate();
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -54,7 +56,7 @@ export const Navbar = ({ profile }) => {
                   <div className="text-gray-500">{profile?.email}</div>
                 </div>
                 <button
-                  onClick={() => {/* TODO: Navigate to profile */}}
+                  onClick={() => navigate("/ProfileSettingsPage")}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Profile Settings

@@ -1,0 +1,428 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- =============================================
+-- CORE TABLES (Independent tables first)
+-- =============================================
+
+-- Users table (Authentication and basic user info)
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    contact VARCHAR(20)
+);
+
+-- Roles table
+CREATE TABLE roles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    is_custom BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES users(id)
+);
+
+-- Permissions table
+CREATE TABLE permissions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) UNIQUE NOT NULL,
+    description TEXT
+);
+
+-- Fee categories table
+CREATE TABLE fee_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+-- Fee types table
+CREATE TABLE fee_types (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+-- Income categories table
+CREATE TABLE income_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+-- Expense categories table
+CREATE TABLE expense_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT
+);
+
+-- Academic calendar table
+CREATE TABLE academic_calendar (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    academic_year VARCHAR(20) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    description TEXT
+);
+
+-- =============================================
+-- JUNCTION/RELATIONSHIP TABLES
+-- =============================================
+
+-- User roles junction table
+CREATE TABLE user_roles (
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+    PRIMARY KEY (user_id, role_id)
+);
+
+-- Role permissions junction table
+CREATE TABLE role_permissions (
+    role_id UUID REFERENCES roles(id) ON DELETE CASCADE,
+    permission_id UUID REFERENCES permissions(id) ON DELETE CASCADE,
+    PRIMARY KEY (role_id, permission_id)
+);
+
+-- =============================================
+-- ADMISSION AND FAMILY MANAGEMENT
+-- =============================================
+
+-- Admission inquiries table
+CREATE TABLE admission_inquiries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parent_name VARCHAR(255) NOT NULL,
+    contact VARCHAR(20),
+    email VARCHAR(255),
+    child_name VARCHAR(255) NOT NULL,
+    inquiry_date DATE DEFAULT CURRENT_DATE,
+    status VARCHAR(50) DEFAULT 'pending',
+    description TEXT,
+    notes TEXT
+);
+
+-- Families table
+CREATE TABLE families (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    father_name VARCHAR(255),
+    family_name VARCHAR(255),
+    contact_number VARCHAR(20),
+    email VARCHAR(255),
+    address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- STUDENT MANAGEMENT
+-- =============================================
+
+-- Students table
+CREATE TABLE students (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    fullname VARCHAR(255) NOT NULL,
+    dob DATE,
+    family_id UUID REFERENCES families(id),
+    admission_date DATE DEFAULT CURRENT_DATE,
+    gr_number VARCHAR(50) UNIQUE,
+    class VARCHAR(50),
+    section VARCHAR(10),
+    status VARCHAR(20) DEFAULT 'active',
+    profile_image TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- =============================================
+-- ATTENDANCE MANAGEMENT
+-- =============================================
+
+-- Student attendance table
+CREATE TABLE attendance_student (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'present', -- present, absent, late
+    remarks TEXT,
+    UNIQUE(student_id, attendance_date)
+);
+
+-- Staff attendance table
+CREATE TABLE attendance_staff (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    staff_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    attendance_date DATE NOT NULL,
+    status VARCHAR(20) DEFAULT 'present', -- present, absent, late
+    remarks TEXT,
+    UNIQUE(staff_id, attendance_date)
+);
+
+-- =============================================
+-- FEE MANAGEMENT
+-- =============================================
+
+-- Class fees structure table
+CREATE TABLE class_fees (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    class VARCHAR(50) NOT NULL,
+    fee_type_id UUID REFERENCES fee_types(id),
+    amount DECIMAL(10,2) NOT NULL,
+    number_of_installments INTEGER DEFAULT 1
+);
+
+-- Student fees table (individual fee records)
+CREATE TABLE student_fees (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_id UUID REFERENCES students(id) ON DELETE CASCADE,
+    fee_type VARCHAR(100),
+    fee_category_id UUID REFERENCES fee_categories(id),
+    class_fee_id UUID REFERENCES class_fees(id),
+    total_amount DECIMAL(10,2) NOT NULL,
+    discount_amount DECIMAL(10,2) DEFAULT 0,
+    fine_amount DECIMAL(10,2) DEFAULT 0,
+    final_amount DECIMAL(10,2) NOT NULL,
+    due_date DATE,
+    status VARCHAR(20) DEFAULT 'pending', -- pending, paid, overdue
+    remarks TEXT
+);
+
+-- Student fee payments table
+CREATE TABLE student_fee_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_fee_id UUID REFERENCES student_fees(id) ON DELETE CASCADE,
+    payment_date DATE DEFAULT CURRENT_DATE,
+    amount_paid DECIMAL(10,2) NOT NULL,
+    received_by UUID REFERENCES users(id),
+    payment_method VARCHAR(50) DEFAULT 'cash',
+    remarks TEXT
+);
+
+-- Fine lines table (for different types of fines)
+CREATE TABLE fee_fines (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    description TEXT
+);
+
+-- Student fee fines junction table
+CREATE TABLE student_fee_fines (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    student_fee_id UUID REFERENCES student_fees(id) ON DELETE CASCADE,
+    fine_id UUID REFERENCES fee_fines(id),
+    amount DECIMAL(10,2) NOT NULL
+);
+
+-- =============================================
+-- FINANCIAL MANAGEMENT
+-- =============================================
+
+-- School expenses table
+CREATE TABLE school_expenses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    category_id UUID REFERENCES expense_categories(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    amount DECIMAL(10,2) NOT NULL,
+    expense_date DATE DEFAULT CURRENT_DATE,
+    paid_by UUID REFERENCES users(id)
+);
+
+-- Staff salaries table
+CREATE TABLE staff_salaries (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    month_year VARCHAR(7) NOT NULL, -- Format: YYYY-MM
+    base_salary DECIMAL(10,2) NOT NULL,
+    bonuses DECIMAL(10,2) DEFAULT 0,
+    deductions DECIMAL(10,2) DEFAULT 0,
+    total_paid DECIMAL(10,2) NOT NULL,
+    payment_date DATE
+);
+
+-- =============================================
+-- ACADEMIC MANAGEMENT
+-- =============================================
+
+-- Calendar events table
+CREATE TABLE calendar_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    calendar_id UUID REFERENCES academic_calendar(id),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    event_date DATE NOT NULL,
+    is_holiday BOOLEAN DEFAULT FALSE
+);
+
+-- Terms table
+CREATE TABLE terms (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    calendar_id UUID REFERENCES academic_calendar(id),
+    name VARCHAR(100) NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL
+);
+
+-- Term details table (subjects and exam info per term)
+CREATE TABLE term_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    term_id UUID REFERENCES terms(id) ON DELETE CASCADE,
+    subject VARCHAR(100) NOT NULL,
+    syllabus_outline TEXT,
+    exam_weightage DECIMAL(5,2),
+    remarks TEXT
+);
+
+-- Study materials table
+CREATE TABLE study_materials (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    class VARCHAR(50) NOT NULL,
+    section VARCHAR(10),
+    subject VARCHAR(100) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    file_url TEXT
+);
+
+-- Class timetables table
+CREATE TABLE class_timetables (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    class VARCHAR(50) NOT NULL,
+    section VARCHAR(10),
+    day_of_the_week INTEGER NOT NULL, -- 1=Monday, 7=Sunday
+    period INTEGER NOT NULL,
+    subject VARCHAR(100),
+    teacher_id UUID REFERENCES users(id),
+    start_time TIME,
+    end_time TIME,
+    room VARCHAR(50)
+);
+
+-- =============================================
+-- INDEXES FOR PERFORMANCE
+-- =============================================
+
+-- Create indexes for frequently queried columns
+CREATE INDEX idx_students_family_id ON students(family_id);
+CREATE INDEX idx_students_class_section ON students(class, section);
+CREATE INDEX idx_students_gr_number ON students(gr_number);
+CREATE INDEX idx_attendance_student_date ON attendance_student(attendance_date);
+CREATE INDEX idx_attendance_staff_date ON attendance_staff(attendance_date);
+CREATE INDEX idx_student_fees_student_id ON student_fees(student_id);
+CREATE INDEX idx_student_fees_status ON student_fees(status);
+CREATE INDEX idx_student_fee_payments_date ON student_fee_payments(payment_date);
+CREATE INDEX idx_class_timetables_class_section ON class_timetables(class, section);
+CREATE INDEX idx_users_email ON users(email);
+
+-- =============================================
+-- ROW LEVEL SECURITY (RLS) SETUP
+-- =============================================
+
+-- Enable RLS on sensitive tables
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_fees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE student_fee_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE staff_salaries ENABLE ROW LEVEL SECURITY;
+
+-- =============================================
+-- SAMPLE DATA INSERTION (Optional)
+-- =============================================
+
+-- Insert default permissions
+INSERT INTO permissions (name, description) VALUES
+('view_students', 'View student records'),
+('edit_students', 'Edit student records'),
+('view_fees', 'View fee records'),
+('collect_fees', 'Collect fee payments'),
+('view_attendance', 'View attendance records'),
+('mark_attendance', 'Mark student/staff attendance'),
+('view_reports', 'View system reports'),
+('manage_users', 'Manage user accounts'),
+('manage_academic', 'Manage academic calendar and terms');
+
+-- Insert default roles
+INSERT INTO roles (name, is_custom) VALUES
+('Super Admin', false),
+('Principal', false),
+('Teacher', false),
+('Accountant', false),
+('Receptionist', false);
+
+-- Insert default fee categories
+INSERT INTO fee_categories (name, description) VALUES
+('Tuition Fee', 'Monthly tuition charges'),
+('Admission Fee', 'One-time admission charges'),
+('Examination Fee', 'Exam related charges'),
+('Transport Fee', 'School transport charges'),
+('Library Fee', 'Library usage charges'),
+('Sports Fee', 'Sports activities charges');
+
+-- Insert default fee types
+INSERT INTO fee_types (name, description) VALUES
+('Monthly Fee', 'Regular monthly charges'),
+('Annual Fee', 'Yearly charges'),
+('One-time Fee', 'Single payment charges'),
+('Quarterly Fee', 'Every 3 months charges');
+
+-- Success message
+SELECT 'Database schema created successfully! All tables, indexes, and sample data have been set up.' as status;
+
+================ Performance Module =======================
+
+create table exams (
+  id uuid primary key default uuid_generate_v4(),
+  term_details_id uuid references term_details(id) on delete cascade,
+  student_id uuid references students(id) on delete cascade,
+  exam_type varchar(50) not null,
+  subject varchar(100) not null,
+  total_marks int not null,
+  percentage float,
+  grade varchar(3),
+  marks_obtained float,
+  created_at timestamp with time zone default NOW()
+);
+
+create table rechecking_schedule (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  subjects varchar(100),
+  completeness int,
+  accuracy int,
+  clarity int,
+  feedback int,
+  presentation int
+);
+
+create table student_progress_report (
+  id uuid primary key default uuid_generate_v4(),
+  date date not null,
+  day varchar(20),
+  student_id uuid references students(id) on delete cascade,
+  attendance_id uuid references attendance_student(id) on delete cascade,
+  uniform_compliance varchar(50),
+  homework_completion varchar(50),
+  class_discipline varchar(50),
+  class_work varchar(50),
+  punctuality varchar(50),
+  class_participation varchar(50),
+  behavior varchar(50)
+);
+
+create table quiz (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  subject varchar(50),
+  cp varchar(50),
+  rubric int,
+  date date
+);
+
+create table performance (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references students(id) on delete cascade,
+  exam_id uuid references exams(id) on delete cascade,
+  copy_check_id uuid references rechecking_schedule(id) on delete cascade,
+  student_progress_report_id uuid references student_progress_report(id) on delete cascade,
+  quiz_id uuid references quiz(id) on delete cascade
+);
+
+
