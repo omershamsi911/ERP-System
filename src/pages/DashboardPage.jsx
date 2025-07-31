@@ -21,7 +21,7 @@ export const DashboardPage = () => {
   const [error, setError] = useState(null);
 
   // Get all hooks at the top
-  const { getFee } = useFees();
+  const { fetchFees } = useFees();
   const { getAttendanceReport } = useAttendance();
   const { fetchStudents } = useStudents();
 
@@ -34,13 +34,13 @@ export const DashboardPage = () => {
         // Fetch all data in parallel for better performance
         const [studentsResponse, feesResponse, attendanceResponse] = await Promise.all([
           fetchStudents(),
-          getFee(),
+          fetchFees(),
           getAttendanceReport()
         ]);
 
         // Calculate stats
         const activeStudents = studentsResponse.filter(s => s.status === 'active').length;
-        const totalPending = 0;
+        const totalPending = feesResponse.filter(f =>  f.status === 'pending').length;
         const attendanceRate = attendanceResponse?.attendancePercentage || 0;
 
         setStats({
