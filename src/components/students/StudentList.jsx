@@ -240,6 +240,15 @@ export const StudentList = () => {
         }
         return <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>;
       }
+      key: 'families',
+      label: "Father's Name",
+      sortable: false,
+      render: (value, row) => {
+        if (editingStudent === row.id) {
+          return renderEditableCell(value?.father_name || 'N/A', 'family_id', row.id, 'family_select');
+        }
+        return <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>;
+      }
     },
     {
       key: 'class',
@@ -559,4 +568,4 @@ export const StudentList = () => {
       />
     </div>
   );
-};
+    };
