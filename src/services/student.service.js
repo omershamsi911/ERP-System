@@ -5,7 +5,7 @@ export const studentService = {
     try {
       let query = supabase
         .from('students')
-        .select('id, fullname, class, section, status, created_at, families(father_name)');
+        .select('id,gr_number,fullname,families(father_name),class,section,dob,status,admission_date,  created_at, family_id');
 
       if (filters.class) {
         query = query.eq('class', filters.class);
@@ -30,7 +30,7 @@ export const studentService = {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('id, fullname, class, section, status, gr_number, created_at, family_id, families(father_name)')
+        .select('id,gr_number,fullname,families(father_name,email,contact_number,address),class,section,dob,status,admission_date,  created_at, family_id ')
         .eq('id', id)
         .single();
 

@@ -15,6 +15,7 @@ export const ViewStudentPage = () => {
   const [student, setStudent] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
+
   useEffect(() => {
     const fetchData = async () => {
       const studentData = await getStudent(id);
