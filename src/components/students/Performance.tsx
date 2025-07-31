@@ -5,8 +5,9 @@ import { supabase } from '../../services/supabase';
 
 interface Student {
   id: string;
-  name: string;
-  grade: string;
+  fullname: string; // Fixed: was 'name', should be 'fullname' per schema
+  class: string;    // Fixed: was 'grade', should be 'class' per schema
+  section: string;
 }
 
 interface Exam {
@@ -65,7 +66,7 @@ interface PerformanceData {
   student: Student | null;
 }
 
-const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
+const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
   const [performanceData, setPerformanceData] = useState<PerformanceData>({
     exams: [],
     progressReports: [],
@@ -83,10 +84,15 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       try {
         setLoading(true);
         
-        // Fetch student data
+        // Validate studentId
+        if (!studentId || studentId === 'undefined' || studentId === 'null') {
+          throw new Error('Student ID is required and must be valid');
+        }
+        
+        // Fetch student data - Fixed field references
         const { data: studentData, error: studentError } = await supabase
           .from('students')
-          .select('id, fullname, exams(grade)')
+          .select('id, fullname, class, section') // Fixed: removed invalid exams reference
           .eq('id', studentId)
           .single();
         
@@ -123,7 +129,13 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       }
     };
     
-    fetchData();
+    // Only fetch data if studentId is valid
+    if (studentId && studentId !== 'undefined' && studentId !== 'null') {
+      fetchData();
+    } else {
+      setError('Invalid or missing student ID');
+      setLoading(false);
+    }
   }, [studentId]);
 
   // Calculate performance metrics and predictions
@@ -152,12 +164,12 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
     });
 
     // Calculate overall trend
-    const overallTrend = sortedExams.reduce((acc, exam, index, arr) => {
+    const overallTrend = sortedExams.length > 1 ? sortedExams.reduce((acc, exam, index, arr) => {
       if (index === 0 || exam.percentage === null) return acc;
       const prev = arr[index - 1];
       if (prev.percentage === null) return acc;
       return acc + (exam.percentage - prev.percentage);
-    }, 0) / (sortedExams.length - 1);
+    }, 0) / (sortedExams.length - 1) : 0;
 
     // Calculate average performance by subject
     const subjectAverages = Object.keys(subjectPerformance).map(subject => {
@@ -170,7 +182,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
         subject,
         average: Math.round(average * 100) / 100,
         trend,
-        latest: scores[scores.length - 1].percentage
+        latest: scores[scores.length - 1]?.percentage || 0
       };
     });
 
@@ -187,10 +199,12 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
     const behavioralScores = progressReports.map(report => {
       // Map string values to numeric scores
       const mapScore = (value: string) => {
-        if (value === 'Excellent') return 10;
-        if (value === 'Good') return 8;
-        if (value === 'Satisfactory') return 6;
-        if (value === 'Needs Improvement') return 4;
+        if (!value) return 6; // Handle null/undefined values
+        const lowerValue = value.toLowerCase();
+        if (lowerValue.includes('excellent')) return 10;
+        if (lowerValue.includes('good')) return 8;
+        if (lowerValue.includes('satisfactory')) return 6;
+        if (lowerValue.includes('needs improvement')) return 4;
         return 6; // Default
       };
       
@@ -300,7 +314,14 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
         <div className="text-center text-red-500 p-6 bg-red-50 rounded-lg max-w-md">
           <AlertTriangle className="mx-auto mb-4" size={36} />
           <h3 className="text-xl font-semibold mb-2">Data Loading Error</h3>
-          <p>{error}</p>
+          <p className="mb-4">{error}</p>
+          {(!studentId || studentId === 'undefined' || studentId === 'null') && (
+            <div className="text-sm text-gray-600 bg-gray-100 p-3 rounded">
+              <p><strong>Debug Info:</strong></p>
+              <p>Student ID received: {JSON.stringify(studentId)}</p>
+              <p>Please ensure a valid student ID is passed to this component.</p>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -328,8 +349,8 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
               <User className="text-blue-600" size={24} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{performanceData.student.name}</h1>
-              <p className="text-gray-600">{performanceData.student.grade} • Performance Dashboard</p>
+              <h1 className="text-2xl font-bold text-gray-900">{performanceData.student.fullname}</h1>
+              <p className="text-gray-600">{performanceData.student.class} {performanceData.student.section} • Performance Dashboard</p>
             </div>
           </div>
           <div className="text-right">
@@ -461,7 +482,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
                     <tr key={index} className="border-t">
                       <td className="px-4 py-2 text-sm text-gray-900">{exam.subject}</td>
                       <td className="px-4 py-2 text-sm text-gray-700">{exam.exam_type}</td>
-                      <td className="px-4 py-2 text-sm text-gray-700">{exam.marks_obtained}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{exam.marks_obtained || 'N/A'}</td>
                       <td className="px-4 py-2 text-sm text-gray-700">{exam.total_marks}</td>
                       <td className="px-4 py-2 text-sm font-medium text-gray-900">
                         {exam.percentage !== null ? `${exam.percentage}%` : 'N/A'}
@@ -484,21 +505,32 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
                   ))}
                 </tbody>
               </table>
+              {performanceData.exams.length === 0 && (
+                <div className="text-center py-10 text-gray-500">
+                  No exam data available for this student
+                </div>
+              )}
             </div>
           </div>
 
           {/* Quiz Performance */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quiz Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={performanceData.quizzes}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="subject" />
-                <YAxis domain={[0, 10]} />
-                <Tooltip />
-                <Bar dataKey="rubric" fill="#8B5CF6" name="Quiz Score (out of 10)" />
-              </BarChart>
-            </ResponsiveContainer>
+            {performanceData.quizzes.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={performanceData.quizzes}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="subject" />
+                  <YAxis domain={[0, 10]} />
+                  <Tooltip />
+                  <Bar dataKey="rubric" fill="#8B5CF6" name="Quiz Score (out of 10)" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-center py-10 text-gray-500">
+                No quiz data available for this student
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -515,11 +547,11 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
                   cy="50%" 
                   outerRadius="80%" 
                   data={[
-                    { subject: 'Uniform', A: performanceAnalysis.behavioralScores[0].uniform_compliance },
-                    { subject: 'Homework', A: performanceAnalysis.behavioralScores[0].homework_completion },
-                    { subject: 'Discipline', A: performanceAnalysis.behavioralScores[0].class_discipline },
-                    { subject: 'Punctuality', A: performanceAnalysis.behavioralScores[0].punctuality },
-                    { subject: 'Behavior', A: performanceAnalysis.behavioralScores[0].behavior },
+                    { subject: 'Uniform', A: performanceAnalysis.behavioralScores[performanceAnalysis.behavioralScores.length - 1].uniform_compliance },
+                    { subject: 'Homework', A: performanceAnalysis.behavioralScores[performanceAnalysis.behavioralScores.length - 1].homework_completion },
+                    { subject: 'Discipline', A: performanceAnalysis.behavioralScores[performanceAnalysis.behavioralScores.length - 1].class_discipline },
+                    { subject: 'Punctuality', A: performanceAnalysis.behavioralScores[performanceAnalysis.behavioralScores.length - 1].punctuality },
+                    { subject: 'Behavior', A: performanceAnalysis.behavioralScores[performanceAnalysis.behavioralScores.length - 1].behavior },
                   ]}
                 >
                   <PolarGrid />
@@ -545,31 +577,41 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
           {/* Copy Checking Results */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Assessment Quality Metrics</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {performanceData.rechecking.map((check, index) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-3">{check.subjects}</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Completeness</span>
-                      <span className="text-sm font-medium">{check.completeness}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Accuracy</span>
-                      <span className="text-sm font-medium">{check.accuracy}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Clarity</span>
-                      <span className="text-sm font-medium">{check.clarity}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm text-gray-600">Presentation</span>
-                      <span className="text-sm font-medium">{check.presentation}%</span>
+            {performanceData.rechecking.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {performanceData.rechecking.map((check, index) => (
+                  <div key={index} className="border rounded-lg p-4">
+                    <h4 className="font-medium text-gray-900 mb-3">{check.subjects}</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Completeness</span>
+                        <span className="text-sm font-medium">{check.completeness}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Accuracy</span>
+                        <span className="text-sm font-medium">{check.accuracy}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Clarity</span>
+                        <span className="text-sm font-medium">{check.clarity}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Feedback</span>
+                        <span className="text-sm font-medium">{check.feedback}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm text-gray-600">Presentation</span>
+                        <span className="text-sm font-medium">{check.presentation}%</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-gray-500">
+                No assessment quality data available
+              </div>
+            )}
           </div>
         </div>
       )}
