@@ -214,6 +214,8 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
       };
     });
 
+    
+    
     return {
       subjectAverages,
       predictions,
