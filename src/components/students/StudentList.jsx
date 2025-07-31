@@ -119,7 +119,7 @@ export const StudentList = () => {
       setLoadingUpdate(true);
       
       // Update in Supabase
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('students')
         .update(editFormData)
         .eq('id', studentId)
