@@ -228,7 +228,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
   const generateCommentary = () => {
     const { overallAverage, overallTrend, predictions } = performanceAnalysis;
     
-    let commentary = [];
+    let commentary:string[] = [];
     
     if (overallAverage >= 90) {
       commentary.push("🎉 Outstanding academic performance! The student consistently demonstrates excellence across subjects.");
