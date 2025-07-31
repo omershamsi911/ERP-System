@@ -210,11 +210,13 @@ export const StudentList = () => {
 
   const columns = [
     {
-      key: 'id',
-      label: 'ID',
+      key: 'gr_number',
+      label: 'GR Number',
       sortable: true,
-      render: (value) => (
-        <span className="text-sm font-medium text-gray-900">{value.slice(0, 8)}</span>
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {renderEditableCell(value || 'N/A', 'gr_number', row.id)}
+        </div>
       )
     },
     {
@@ -228,27 +230,15 @@ export const StudentList = () => {
       )
     },
     {
-      key: 'dob',
-      label: 'Date of Birth',
-      sortable: true,
-      render: (value, row) => (
-        <div className="text-sm text-gray-900">
-          {editingStudent === row.id ? 
-            renderEditableCell(value, 'dob', row.id, 'date') :
-            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
-          }
-        </div>
-      )
-    },
-    {
-      key: 'gr_number',
-      label: 'GR Number',
-      sortable: true,
-      render: (value, row) => (
-        <div className="text-sm text-gray-900">
-          {renderEditableCell(value || 'N/A', 'gr_number', row.id)}
-        </div>
-      )
+      key: 'families',
+      label: "Father's Name",
+      sortable: false,
+      render: (value, row) => {
+        if (editingStudent === row.id) {
+          return renderEditableCell(value?.father_name || 'N/A', 'family_id', row.id, 'family_select');
+        }
+        return <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>;
+      }
     },
     {
       key: 'class',
@@ -267,6 +257,32 @@ export const StudentList = () => {
       render: (value, row) => (
         <div className="text-sm text-gray-900">
           {renderEditableCell(value, 'section', row.id)}
+        </div>
+      )
+    },
+    {
+      key: 'dob',
+      label: 'Date of Birth',
+      sortable: true,
+      render: (value, row) => (
+        <div className="text-sm text-gray-900">
+          {editingStudent === row.id ? 
+            renderEditableCell(value, 'dob', row.id, 'date') :
+            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
+          }
+        </div>
+      )
+    },
+    {
+      key: 'admission_date',
+      label: 'Admission Date',
+      sortable: true,
+      render: (value, row) => (
+        <div className="text-sm text-gray-500">
+          {editingStudent === row.id ? 
+            renderEditableCell(value, 'admission_date', row.id, 'date') :
+            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
+          }
         </div>
       )
     },
@@ -296,30 +312,8 @@ export const StudentList = () => {
         );
       }
     },
-    {
-      key: 'admission_date',
-      label: 'Admission Date',
-      sortable: true,
-      render: (value, row) => (
-        <div className="text-sm text-gray-500">
-          {editingStudent === row.id ? 
-            renderEditableCell(value, 'admission_date', row.id, 'date') :
-            <span>{value ? new Date(value).toLocaleDateString() : 'N/A'}</span>
-          }
-        </div>
-      )
-    },
-    {
-      key: 'families',
-      label: "Father's Name",
-      sortable: false,
-      render: (value, row) => {
-        if (editingStudent === row.id) {
-          return renderEditableCell(value?.father_name || 'N/A', 'family_id', row.id, 'family_select');
-        }
-        return <span className="text-sm text-gray-900">{value?.father_name || 'N/A'}</span>;
-      }
-    },
+    
+    
     {
       key: 'actions',
       label: 'Actions',
