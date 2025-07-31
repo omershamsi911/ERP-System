@@ -7,7 +7,7 @@ import {DashboardPage} from "./pages/DashboardPage";
 import {StudentsPage} from "./pages/StudentsPage";
 import {StudentPage} from "./pages/StudentPage";
 import FeesPage from './pages/FeesPage';
-import {AttendancePage} from './pages/AttendancePage';
+import AttendancePage from './pages/Attendace';
 import {ReportsPage} from './pages/ReportsPage';
 import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
 import {SettingsPage} from "./pages/SettingsPage";
