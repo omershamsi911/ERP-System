@@ -12,6 +12,7 @@ export const useFees = () => {
     try {
       const data = await feesService.getFees(filters);
       setFees(data);
+      return data;
     } catch (err) {
       setError(err.message || 'Failed to fetch fees');
     } finally {
