@@ -24,10 +24,7 @@ export const attendanceService = {
     try {
       const { data, error } = await supabase
         .from('attendance_student')
-        .select(`
-          *,
-          student:students(first_name, last_name, email)
-        `)
+        .select(`*`)
         .eq('id', id)
         .single();
 

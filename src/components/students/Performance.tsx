@@ -39,6 +39,7 @@ interface Student {
   fullname: string
   class: string
   section: string
+  status: string
 }
 
 interface Exam {
@@ -130,7 +131,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
 
         const { data: studentData, error: studentError } = await supabase
           .from("students")
-          .select("id, fullname, class, section")
+          .select("id, fullname, class, section , status")
           .eq("id", studentId)
           .single()
 
@@ -552,7 +553,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
                 <div className="flex items-center space-x-4 mt-2">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                     <Activity className="w-4 h-4 mr-1" />
-                    Active Student
+                    {performanceData.student.status}
                   </span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                     <Clock className="w-4 h-4 mr-1" />
@@ -742,7 +743,8 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
                       borderRadius: "12px",
                       boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                     }}
-                    formatter={(value) => [`${value}%`, "Performance"]}
+                    formatter={(value, name) => [`${value}%`, name]}
+                    labelFormatter={(label) => `${label} Performance`}
                   />
                   <Legend />
                   <Line
@@ -1063,8 +1065,8 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
                       borderRadius: "12px",
                       boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
                     }}
-                    formatter={(value) => [`${value}%`, "Score"]}
-                    labelFormatter={(value) => `${value} Performance`}
+                    formatter={(value, name) => [`${value}%`, name]}
+                    labelFormatter={(label) => `${label} Performance`}
                   />
                   <Legend />
                   <Bar
@@ -1073,22 +1075,22 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
                     name="Midterm"
                     radius={[4, 4, 0, 0]}
                   />
+                    <Bar
+                      dataKey="quiz"
+                      fill="url(#quizGradient)"
+                      name="Quiz Avg"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="rechecking"
+                      fill="url(#recheckingGradient)"
+                      name="Rechecking"
+                      radius={[4, 4, 0, 0]}
+                    />
                   <Bar
                     dataKey="final"
                     fill="url(#finalGradient)"
                     name="Final"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="quiz"
-                    fill="url(#quizGradient)"
-                    name="Quiz Avg"
-                    radius={[4, 4, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="rechecking"
-                    fill="url(#recheckingGradient)"
-                    name="Rechecking"
                     radius={[4, 4, 0, 0]}
                   />
                   <Bar

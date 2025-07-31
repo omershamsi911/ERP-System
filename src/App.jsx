@@ -20,6 +20,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import LoginForm from "./components/auth/LoginForm";
 import SignupForm from "./components/auth/SignupForm";
 import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
+import './styles/Report.css';
 function App() {
   return (
     <AuthProvider>

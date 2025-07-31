@@ -13,8 +13,8 @@ import StudentAttendanceSummary from '../components/students/StudentAttendance';
 export const ViewStudentPage = () => {
   const { id } = useParams();
   const { getStudent, loading: studentLoading } = useStudents();
-  const { getStudentFees, fees, loading: feesLoading } = useFees();
-  const { getStudentAttendance, attendance, loading: attendanceLoading } = useAttendance();
+  const { fetchFees, fees, loading: feesLoading } = useFees();
+  const { getAttendance, attendance, loading: attendanceLoading } = useAttendance();
   const [student, setStudent] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -23,11 +23,14 @@ export const ViewStudentPage = () => {
     const fetchData = async () => {
       const studentData = await getStudent(id);
       setStudent(studentData);
-      await getStudentFees(id);
-      await getStudentAttendance(id, null, null);
+      await fetchFees(id);
+      const data = await getAttendance(id);
+      console.log(data)
     };
     fetchData();
   }, [id]);
+
+
 
   if (studentLoading) return <LoadingSpinner />;
   if (!student) return <div>Student not found</div>;
