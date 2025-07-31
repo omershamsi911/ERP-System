@@ -1436,6 +1436,8 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
       }
     })
 
+    
+    
     return {
       subjectAverages,
       overallTrend: isNaN(overallTrend) ? 0 : overallTrend,

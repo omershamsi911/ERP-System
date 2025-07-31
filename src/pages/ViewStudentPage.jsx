@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { DataTable } from '../components/shared/DataTable';
 import { formatDate, formatCurrency } from '../utils/helpers';
 import StudentPerformanceDashboard from '../components/students/Performance';
+import StudentFeeStatus from '../components/students/StudentFees';
 
 export const ViewStudentPage = () => {
   const { id } = useParams();
@@ -110,15 +111,7 @@ export const ViewStudentPage = () => {
         )}
         {activeTab === 'fees' && (
           <div>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Fee Records</h2>
-            </div>
-            {feesLoading && <LoadingSpinner fullPage={false} />}
-            {!feesLoading && fees.length > 0 ? (
-              <DataTable columns={feeColumns} data={fees} />
-            ) : (
-              <p className="text-gray-500">No fee records found</p>
-            )}
+            <StudentFeeStatus studentId={id}/>
           </div>
         )}
         {activeTab === 'attendance' && (
