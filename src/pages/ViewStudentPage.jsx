@@ -74,7 +74,7 @@ export const ViewStudentPage = () => {
           <button onClick={() => setActiveTab('overview')} className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'overview' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Overview</button>
           <button onClick={() => setActiveTab('fees')} className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'fees' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Fees</button>
           <button onClick={() => setActiveTab('attendance')} className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'attendance' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Attendance</button>
-          <button onClick={() => setActiveTab('academic')} className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'academic' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Academic</button>
+          <button onClick={() => setActiveTab('academic')} className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${activeTab === 'academic' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>Academic Performance</button>
         </nav>
       </div>
       <div className="p-6">

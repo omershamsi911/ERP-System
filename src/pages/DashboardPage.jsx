@@ -6,6 +6,7 @@ import { StatsCard } from '../components/dashboard/StatsCard';
 import { RecentActivity } from '../components/dashboard/RecentActivity';
 import { FaUserGraduate, FaMoneyBillWave, FaClock, FaUsers } from 'react-icons/fa';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
+import { Link } from 'react-router-dom';
 
 export const DashboardPage = () => {
   const [stats, setStats] = useState({
@@ -122,7 +123,11 @@ export const DashboardPage = () => {
           <div className="grid grid-cols-2 gap-4">
             <button className="bg-blue-100 hover:bg-blue-200 text-blue-800 p-4 rounded-lg flex flex-col items-center">
               <FaUserGraduate className="text-2xl mb-2" />
-              <span>Add Student</span>
+              <span>
+                <Link to="/students/add">
+                  Add Student
+                </Link>
+                </span>
             </button>
             <button className="bg-green-100 hover:bg-green-200 text-green-800 p-4 rounded-lg flex flex-col items-center">
               <FaMoneyBillWave className="text-2xl mb-2" />
