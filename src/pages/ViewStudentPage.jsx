@@ -8,6 +8,7 @@ import { DataTable } from '../components/shared/DataTable';
 import { formatDate, formatCurrency } from '../utils/helpers';
 import StudentPerformanceDashboard from '../components/students/Performance';
 import StudentFeeStatus from '../components/students/StudentFees';
+import StudentAttendanceSummary from '../components/students/StudentAttendance';
 
 export const ViewStudentPage = () => {
   const { id } = useParams();
@@ -116,13 +117,7 @@ export const ViewStudentPage = () => {
         )}
         {activeTab === 'attendance' && (
           <div>
-            <h2 className="text-lg font-semibold mb-4">Attendance Records</h2>
-            {attendanceLoading && <LoadingSpinner fullPage={false} />}
-            {!attendanceLoading && attendance.length > 0 ? (
-              <DataTable columns={attendanceColumns} data={attendance} />
-            ) : (
-              <p className="text-gray-500">No attendance records found</p>
-            )}
+            <StudentAttendanceSummary studentId={id}/>
           </div>
         )}
         {activeTab === 'academic' && (
