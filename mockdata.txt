@@ -1,0 +1,262 @@
+-- -- -- -- Disable RLS for truncation
+-- -- -- ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE students DISABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE student_fees DISABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE student_fee_payments DISABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE staff_salaries DISABLE ROW LEVEL SECURITY;
+
+-- -- -- -- Truncate tables in reverse dependency order
+-- -- -- TRUNCATE TABLE 
+-- -- --   performance,
+-- -- --   exams, rechecking_schedule, student_progress_report, quiz,
+-- -- --   term_details, terms, calendar_events, class_timetables, study_materials,
+-- -- --   staff_salaries, school_expenses,
+-- -- --   student_fee_fines, student_fee_payments, student_fees, class_fees, fee_fines,
+-- -- --   attendance_student, attendance_staff,
+-- -- --   students, families, admission_inquiries,
+-- -- --   user_roles, role_permissions,
+-- -- --   users, roles, permissions,
+-- -- --   fee_categories, fee_types, income_categories, expense_categories,
+-- -- --   academic_calendar
+-- -- -- CASCADE;
+
+-- -- -- -- Re-enable RLS
+-- -- -- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE student_fees ENABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE student_fee_payments ENABLE ROW LEVEL SECURITY;
+-- -- -- ALTER TABLE staff_salaries ENABLE ROW LEVEL SECURITY;
+
+-- -- -- 1. Core Tables
+-- -- -- Permissions
+-- -- INSERT INTO permissions (name, description) VALUES
+-- -- ('view_students', 'View student records'),
+-- -- ('edit_students', 'Edit student records'),
+-- -- ('view_fees', 'View fee records'),
+-- -- ('collect_fees', 'Collect fee payments'),
+-- -- ('view_attendance', 'View attendance records'),
+-- -- ('mark_attendance', 'Mark student/staff attendance'),
+-- -- ('view_reports', 'View system reports'),
+-- -- ('manage_users', 'Manage user accounts'),
+-- -- ('manage_academic', 'Manage academic calendar and terms');
+
+-- -- -- Roles
+-- -- INSERT INTO roles (name, is_custom) VALUES
+-- -- ('Super Admin', false),
+-- -- ('Principal', false),
+-- -- ('Teacher', false),
+-- -- ('Accountant', false),
+-- -- ('Receptionist', false);
+
+-- -- -- Fee Categories
+-- -- INSERT INTO fee_categories (name, description) VALUES
+-- -- ('Tuition Fee', 'Monthly tuition charges'),
+-- -- ('Admission Fee', 'One-time admission charges'),
+-- -- ('Examination Fee', 'Exam related charges');
+
+-- -- -- Fee Types
+-- -- INSERT INTO fee_types (name, description) VALUES
+-- -- ('Monthly Fee', 'Regular monthly charges'),
+-- -- ('Annual Fee', 'Yearly charges'),
+-- -- ('One-time Fee', 'Single payment charges');
+
+-- -- -- Academic Calendar
+-- -- INSERT INTO academic_calendar (academic_year, start_date, end_date, description) VALUES
+-- -- ('2024-2025', '2024-06-01', '2025-05-31', 'Primary Academic Year');
+
+-- -- -- 2. Users & Security
+-- -- INSERT INTO users (email, full_name, password_hash, contact) VALUES
+-- -- ('admin@school.edu', 'Admin User', 'hash1', '+123456789'),
+-- -- ('teacher1@school.edu', 'Jane Smith', 'hash2', '+987654321'),
+-- -- ('accountant@school.edu', 'Bob Lee', 'hash3', '+1122334455');
+
+-- -- -- User-Role Assignments
+-- -- INSERT INTO user_roles (user_id, role_id)
+-- -- SELECT u.id, r.id 
+-- -- FROM users u, roles r 
+-- -- WHERE u.email = 'admin@school.edu' AND r.name = 'Super Admin';
+
+-- -- -- Role-Permissions (Super Admin gets all permissions)
+-- -- INSERT INTO role_permissions (role_id, permission_id)
+-- -- SELECT r.id, p.id 
+-- -- FROM roles r, permissions p 
+-- -- WHERE r.name = 'Super Admin';
+
+-- -- -- 3. Admissions & Families
+-- -- INSERT INTO families (father_name, family_name, contact_number, email, address) VALUES
+-- -- ('John Doe', 'Doe Family', '+1555666777', 'doe@family.com', '123 Main St'),
+-- -- ('Mike Chen', 'Chen Family', '+1888999000', 'chen@family.com', '456 Oak Ave');
+
+-- -- INSERT INTO students (fullname, dob, family_id, gr_number, class, section) VALUES
+-- -- ('Alice Doe', '2015-03-12', (SELECT id FROM families WHERE family_name = 'Doe Family'), 'GR001', 'Grade 1', 'A'),
+-- -- ('Ben Chen', '2014-11-05', (SELECT id FROM families WHERE family_name = 'Chen Family'), 'GR002', 'Grade 2', 'B');
+
+-- -- -- 4. Attendance
+-- -- INSERT INTO attendance_student (student_id, attendance_date, status) VALUES
+-- -- ((SELECT id FROM students WHERE gr_number = 'GR001'), '2024-09-01', 'present'),
+-- -- ((SELECT id FROM students WHERE gr_number = 'GR002'), '2024-09-01', 'late');
+
+-- -- -- 5. Fees & Financials
+-- -- INSERT INTO class_fees (class, fee_type_id, amount) VALUES
+-- -- ('Grade 1', (SELECT id FROM fee_types WHERE name = 'Monthly Fee'), 100.00),
+-- -- ('Grade 2', (SELECT id FROM fee_types WHERE name = 'Monthly Fee'), 120.00);
+
+-- -- INSERT INTO student_fees (
+-- --   student_id, 
+-- --   fee_type, 
+-- --   total_amount, 
+-- --   final_amount, 
+-- --   due_date
+-- -- ) VALUES
+-- -- ((SELECT id FROM students WHERE gr_number = 'GR001'), 'Monthly Fee', 100.00, 100.00, '2024-09-10'),
+-- -- ((SELECT id FROM students WHERE gr_number = 'GR002'), 'Monthly Fee', 120.00, 120.00, '2024-09-10');
+
+-- -- -- 6. Academic Structure
+-- -- INSERT INTO terms (calendar_id, name, start_date, end_date) VALUES
+-- -- ((SELECT id FROM academic_calendar), 'Term 1', '2024-06-01', '2024-11-30');
+
+-- -- INSERT INTO term_details (term_id, subject, exam_weightage) VALUES
+-- -- ((SELECT id FROM terms), 'Mathematics', 30.0),
+-- -- ((SELECT id FROM terms), 'Science', 25.0);
+
+-- -- -- 7. Performance Module
+-- -- INSERT INTO exams (term_details_id, student_id, exam_type, subject, marks_obtained, total_marks) VALUES
+-- -- ((SELECT id FROM term_details WHERE subject = 'Mathematics'), 
+-- --  (SELECT id FROM students WHERE gr_number = 'GR001'), 
+-- --  'Midterm', 'Mathematics', 85.0, 100);
+
+-- -- -- Verify
+-- -- SELECT 'Data inserted successfully!' AS message;
+
+-- -- Insert additional exam records
+-- INSERT INTO exams (term_details_id, student_id, exam_type, subject, marks_obtained, total_marks, percentage, grade) 
+-- SELECT 
+--     (SELECT id FROM term_details WHERE subject = 'Science'),
+--     s.id,
+--     'Final',
+--     'Science',
+--     92.5,
+--     100,
+--     92.5,
+--     'A'
+-- FROM students s WHERE gr_number = 'GR001';
+
+-- -- Insert rechecking schedule
+-- INSERT INTO rechecking_schedule (student_id, subjects, completeness, accuracy, clarity, feedback, presentation)
+-- SELECT 
+--     id,
+--     'Mathematics',
+--     85,
+--     90,
+--     88,
+--     92,
+--     87
+-- FROM students WHERE gr_number = 'GR001';
+
+-- -- Insert student progress reports
+-- INSERT INTO student_progress_report (date, day, student_id, attendance_id, uniform_compliance, homework_completion, class_discipline, class_work, punctuality, class_participation, behavior)
+-- SELECT 
+--     '2024-09-01',
+--     'Monday',
+--     s.id,
+--     a.id,
+--     'Good',
+--     'Complete',
+--     'Excellent',
+--     'Submitted',
+--     'On Time',
+--     'Active',
+--     'Good'
+-- FROM students s
+-- JOIN attendance_student a ON s.id = a.student_id
+-- WHERE s.gr_number = 'GR001' AND a.attendance_date = '2024-09-01';
+
+-- -- Insert quiz records
+-- INSERT INTO quiz (student_id, subject, cp, rubric, date)
+-- SELECT 
+--     id,
+--     'Mathematics',
+--     'Algebra',
+--     88,
+--     '2024-09-05'
+-- FROM students WHERE gr_number = 'GR001';
+
+-- -- Insert performance records linking all components
+-- INSERT INTO performance (student_id, exam_id, copy_check_id, student_progress_report_id, quiz_id)
+-- SELECT 
+--     s.id,
+--     e.id,
+--     r.id,
+--     p.id,
+--     q.id
+-- FROM students s
+-- LEFT JOIN exams e ON s.id = e.student_id AND e.subject = 'Science'
+-- LEFT JOIN rechecking_schedule r ON s.id = r.student_id
+-- LEFT JOIN student_progress_report p ON s.id = p.student_id
+-- LEFT JOIN quiz q ON s.id = q.student_id
+-- WHERE s.gr_number = 'GR001';
+
+-- -- Insert for second student (Ben Chen)
+-- INSERT INTO exams (term_details_id, student_id, exam_type, subject, marks_obtained, total_marks, percentage, grade) 
+-- SELECT 
+--     (SELECT id FROM term_details WHERE subject = 'Mathematics'),
+--     s.id,
+--     'Midterm',
+--     'Mathematics',
+--     78.0,
+--     100,
+--     78.0,
+--     'B+'
+-- FROM students s WHERE gr_number = 'GR002';
+
+-- INSERT INTO student_progress_report (date, day, student_id, attendance_id, uniform_compliance, homework_completion, class_discipline, class_work, punctuality, class_participation, behavior)
+-- SELECT 
+--     '2024-09-01',
+--     'Monday',
+--     s.id,
+--     a.id,
+--     'Fair',
+--     'Partial',
+--     'Good',
+--     'Incomplete',
+--     'Late',
+--     'Average',
+--     'Satisfactory'
+-- FROM students s
+-- JOIN attendance_student a ON s.id = a.student_id
+-- WHERE s.gr_number = 'GR002' AND a.attendance_date = '2024-09-01';
+
+-- INSERT INTO quiz (student_id, subject, cp, rubric, date)
+-- SELECT 
+--     id,
+--     'Science',
+--     'Biology',
+--     75,
+--     '2024-09-04'
+-- FROM students WHERE gr_number = 'GR002';
+
+-- INSERT INTO performance (student_id, exam_id, student_progress_report_id, quiz_id)
+-- SELECT 
+--     s.id,
+--     e.id,
+--     p.id,
+--     q.id
+-- FROM students s
+-- LEFT JOIN exams e ON s.id = e.student_id
+-- LEFT JOIN student_progress_report p ON s.id = p.student_id
+-- LEFT JOIN quiz q ON s.id = q.student_id
+-- WHERE s.gr_number = 'GR002';
+
+-- Verification
+-- SELECT 
+--     (SELECT COUNT(*) FROM exams) AS exam_count,
+--     (SELECT COUNT(*) FROM rechecking_schedule) AS recheck_count,
+--     (SELECT COUNT(*) FROM student_progress_report) AS progress_count,
+--     (SELECT COUNT(*) FROM quiz) AS quiz_count,
+--     (SELECT COUNT(*) FROM performance) AS performance_count;
+
+-- ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE students DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE student_fees DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE student_fee_payments DISABLE ROW LEVEL SECURITY;
+-- ALTER TABLE staff_salaries DISABLE ROW LEVEL SECURITY;
