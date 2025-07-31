@@ -3,70 +3,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { TrendingUp, TrendingDown, Award, AlertTriangle, User, Calendar, BookOpen } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
-interface Student {
-  id: string;
-  name: string;
-  grade: string;
-}
-
-interface Exam {
-  id: string;
-  term_details_id: string;
-  student_id: string;
-  exam_type: string;
-  subject: string;
-  total_marks: number;
-  percentage: number | null;
-  grade: string | null;
-  marks_obtained: number | null;
-  created_at: string;
-}
-
-interface Rechecking {
-  id: string;
-  student_id: string;
-  subjects: string;
-  completeness: number;
-  accuracy: number;
-  clarity: number;
-  feedback: number;
-  presentation: number;
-}
-
-interface ProgressReport {
-  id: string;
-  date: string;
-  day: string | null;
-  student_id: string;
-  attendance_id: string | null;
-  uniform_compliance: string;
-  homework_completion: string;
-  class_discipline: string;
-  class_work: string | null;
-  punctuality: string;
-  class_participation: string | null;
-  behavior: string;
-}
-
-interface Quiz {
-  id: string;
-  student_id: string;
-  subject: string;
-  cp: string | null;
-  rubric: number;
-  date: string;
-}
-
-interface PerformanceData {
-  exams: Exam[];
-  progressReports: ProgressReport[];
-  quizzes: Quiz[];
-  rechecking: Rechecking[];
-  student: Student | null;
-}
-
-const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
-  const [performanceData, setPerformanceData] = useState<PerformanceData>({
+const StudentPerformanceDashboard = ({ studentId }) => {
+  const [performanceData, setPerformanceData] = useState({
     exams: [],
     progressReports: [],
     quizzes: [],
@@ -74,16 +12,14 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
     student: null
   });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Fetch data from Supabase
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch student data
         const { data: studentData, error: studentError } = await supabase
           .from('students')
           .select('id, fullname, exams(grade)')
@@ -92,7 +28,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
         
         if (studentError) throw studentError;
         
-        // Fetch all related data in parallel
         const [
           { data: examsData, error: examsError },
           { data: progressData, error: progressError },
@@ -116,7 +51,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
           quizzes: quizzesData || [],
           rechecking: recheckingData || []
         });
-      } catch (err: any) {
+      } catch (err) {
         setError(err.message || 'Failed to load data');
       } finally {
         setLoading(false);
@@ -126,22 +61,18 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
     fetchData();
   }, [studentId]);
 
-  // Calculate performance metrics and predictions
   const performanceAnalysis = useMemo(() => {
     const { exams, progressReports, quizzes, rechecking } = performanceData;
     
-    // Sort exams by date
     const sortedExams = [...exams].sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
     
-    // Calculate subject-wise performance trends
-    const subjectPerformance: Record<string, { type: string; percentage: number; date: string }[]> = {};
+    const subjectPerformance = {};
     sortedExams.forEach(exam => {
       if (!subjectPerformance[exam.subject]) {
         subjectPerformance[exam.subject] = [];
       }
-      // Ensure percentage is available
       if (exam.percentage !== null) {
         subjectPerformance[exam.subject].push({
           type: exam.exam_type,
@@ -151,7 +82,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       }
     });
 
-    // Calculate overall trend
     const overallTrend = sortedExams.reduce((acc, exam, index, arr) => {
       if (index === 0 || exam.percentage === null) return acc;
       const prev = arr[index - 1];
@@ -159,7 +89,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       return acc + (exam.percentage - prev.percentage);
     }, 0) / (sortedExams.length - 1);
 
-    // Calculate average performance by subject
     const subjectAverages = Object.keys(subjectPerformance).map(subject => {
       const scores = subjectPerformance[subject];
       const average = scores.reduce((sum, score) => sum + score.percentage, 0) / scores.length;
@@ -174,7 +103,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       };
     });
 
-    // Predict future performance
     const predictions = subjectAverages.map(subj => {
       const predicted = subj.latest + (subj.trend * 0.5);
       return {
@@ -183,15 +111,13 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       };
     });
 
-    // Calculate behavioral scores
     const behavioralScores = progressReports.map(report => {
-      // Map string values to numeric scores
-      const mapScore = (value: string) => {
+      const mapScore = (value) => {
         if (value === 'Excellent') return 10;
         if (value === 'Good') return 8;
         if (value === 'Satisfactory') return 6;
         if (value === 'Needs Improvement') return 4;
-        return 6; // Default
+        return 6;
       };
       
       const scores = {
@@ -220,13 +146,11 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
     };
   }, [performanceData]);
 
-  // Generate performance commentary
   const generateCommentary = () => {
     const { overallAverage, overallTrend, predictions } = performanceAnalysis;
     
-    let commentary: string[] = [];
+    let commentary = [];
     
-    // Overall performance assessment
     if (overallAverage >= 90) {
       commentary.push("🎉 Outstanding academic performance! The student consistently demonstrates excellence across subjects.");
     } else if (overallAverage >= 80) {
@@ -237,7 +161,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       commentary.push("⚠️ Academic performance needs attention and focused intervention.");
     }
 
-    // Trend analysis
     if (overallTrend > 2) {
       commentary.push("📈 Excellent upward trend - the student is showing consistent improvement over time.");
     } else if (overallTrend > 0) {
@@ -248,7 +171,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       commentary.push("➡️ Stable performance - maintaining consistent academic standards.");
     }
 
-    // Subject-specific insights
     const strongSubjects = predictions.filter(subj => subj.average >= 85);
     const weakSubjects = predictions.filter(subj => subj.average < 75);
 
@@ -260,7 +182,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
       commentary.push(`📚 Areas needing attention: ${weakSubjects.map(s => s.subject).join(', ')}`);
     }
 
-    // Future predictions
     const improvingSubjects = predictions.filter(subj => subj.predicted > subj.latest);
     if (improvingSubjects.length > 0) {
       commentary.push(`🔮 Predicted improvements in: ${improvingSubjects.map(s => s.subject).join(', ')}`);
@@ -320,7 +241,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
 
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -339,7 +259,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="flex space-x-4 mb-6">
         <TabButton tabKey="overview" label="Overview" icon={Award} />
         <TabButton tabKey="trends" label="Trends" icon={TrendingUp} />
@@ -349,7 +268,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          {/* Performance Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {performanceAnalysis.subjectAverages.map((subject, index) => (
               <div key={index} className="bg-white rounded-lg shadow-sm p-6">
@@ -383,7 +301,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
             ))}
           </div>
 
-          {/* Performance Commentary */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Analysis</h3>
             <div className="space-y-3">
@@ -399,7 +316,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
 
       {activeTab === 'trends' && (
         <div className="space-y-6">
-          {/* Performance Trend Chart */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Academic Performance Trends</h3>
             <ResponsiveContainer width="100%" height={400}>
@@ -420,7 +336,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Predicted vs Current Performance */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Current vs Predicted Performance</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -440,7 +355,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
 
       {activeTab === 'subjects' && (
         <div className="space-y-6">
-          {/* Exam Results Table */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Detailed Exam Results</h3>
             <div className="overflow-x-auto">
@@ -487,7 +401,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
             </div>
           </div>
 
-          {/* Quiz Performance */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quiz Performance</h3>
             <ResponsiveContainer width="100%" height={300}>
@@ -505,7 +418,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
 
       {activeTab === 'behavior' && (
         <div className="space-y-6">
-          {/* Behavioral Performance Radar Chart */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Behavioral Assessment</h3>
             {performanceAnalysis.behavioralScores.length > 0 ? (
@@ -542,7 +454,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId: string }) => {
             )}
           </div>
 
-          {/* Copy Checking Results */}
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Assessment Quality Metrics</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

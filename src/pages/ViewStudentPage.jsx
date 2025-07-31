@@ -134,7 +134,7 @@ export const ViewStudentPage = () => {
         )}
         {activeTab === 'academic' && (
           <div>
-            <StudentPerformanceDashboard props={{id}}/>
+            <StudentPerformanceDashboard studentId={id}/>
           </div>
         )}
       </div>
