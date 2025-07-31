@@ -6,6 +6,7 @@ import { useAttendance } from '../hooks/useAttendance';
 import { LoadingSpinner } from '../components/shared/LoadingSpinner';
 import { DataTable } from '../components/shared/DataTable';
 import { formatDate, formatCurrency } from '../utils/helpers';
+import StudentPerformanceDashboard from '../components/students/Performance';
 
 export const ViewStudentPage = () => {
   const { id } = useParams();
@@ -133,8 +134,7 @@ export const ViewStudentPage = () => {
         )}
         {activeTab === 'academic' && (
           <div>
-            <h2 className="text-lg font-semibold mb-4">Academic Performance</h2>
-            <p className="text-gray-500">Academic records will be displayed here once available.</p>
+            <StudentPerformanceDashboard props={{id}}/>
           </div>
         )}
       </div>
