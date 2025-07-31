@@ -1,5 +1,4 @@
-// "use client"
-
+// import React from "react"
 // import { useState, useMemo, useEffect } from "react"
 // import {
 //   LineChart,
@@ -98,6 +97,13 @@
 //   student: Student | null
 // }
 
+// interface RegressionMetrics {
+//   slope: number
+//   intercept: number
+//   r2: number
+//   mse: number
+// }
+
 // const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
 //   const [performanceData, setPerformanceData] = useState<PerformanceData>({
 //     exams: [],
@@ -107,9 +113,10 @@
 //     student: null,
 //   })
 //   const [loading, setLoading] = useState(true)
-//   const [error, setError] = useState(null)
+//   const [error, setError] = useState<string | null>(null)
 //   const [activeTab, setActiveTab] = useState("overview")
 //   const [showPredictions, setShowPredictions] = useState(false)
+//   const [regressionMetrics, setRegressionMetrics] = useState<Record<string, RegressionMetrics>>({})
 
 //   useEffect(() => {
 //     const fetchData = async () => {
@@ -166,13 +173,59 @@
 //     }
 //   }, [studentId])
 
+//   // Linear regression helper function
+//   const calculateLinearRegression = (x: number[], y: number[]) => {
+//     const n = x.length
+//     let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0
+
+//     for (let i = 0; i < n; i++) {
+//       sumX += x[i]
+//       sumY += y[i]
+//       sumXY += x[i] * y[i]
+//       sumXX += x[i] * x[i]
+//     }
+
+//     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+//     const intercept = (sumY - slope * sumX) / n
+
+//     // Calculate R-squared and MSE
+//     let ssr = 0
+//     let sst = 0
+//     const meanY = sumY / n
+
+//     for (let i = 0; i < n; i++) {
+//       const yPred = slope * x[i] + intercept
+//       ssr += Math.pow(yPred - meanY, 2)
+//       sst += Math.pow(y[i] - meanY, 2)
+//     }
+
+//     const r2 = ssr / sst
+//     let mse = 0
+
+//     for (let i = 0; i < n; i++) {
+//       const yPred = slope * x[i] + intercept
+//       mse += Math.pow(y[i] - yPred, 2)
+//     }
+//     mse /= n
+
+//     return { slope, intercept, r2, mse }
+//   }
+
 //   const performanceAnalysis = useMemo(() => {
 //     const { exams, progressReports, quizzes, rechecking } = performanceData
 
 //     const sortedExams = [...exams].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
-//     const subjectPerformance = {}
-//     sortedExams.forEach((exam) => {
+//     const subjectPerformance: Record<string, Array<{ 
+//       type: string; 
+//       percentage: number; 
+//       date: string; 
+//       timeIndex: number 
+//     }>> = {}
+    
+//     const metrics: Record<string, RegressionMetrics> = {}
+
+//     sortedExams.forEach((exam, index) => {
 //       if (!subjectPerformance[exam.subject]) {
 //         subjectPerformance[exam.subject] = []
 //       }
@@ -181,9 +234,30 @@
 //           type: exam.exam_type,
 //           percentage: exam.percentage,
 //           date: exam.created_at,
+//           timeIndex: index
 //         })
 //       }
 //     })
+
+//     // Calculate regression metrics for each subject
+//     Object.keys(subjectPerformance).forEach(subject => {
+//       const scores = subjectPerformance[subject]
+//       if (scores.length > 1) {
+//         const x = scores.map(s => s.timeIndex)
+//         const y = scores.map(s => s.percentage)
+//         metrics[subject] = calculateLinearRegression(x, y)
+//       } else {
+//         // Not enough data for regression
+//         metrics[subject] = {
+//           slope: 0,
+//           intercept: scores.length ? scores[0].percentage : 0,
+//           r2: 0,
+//           mse: 0
+//         }
+//       }
+//     })
+    
+//     setRegressionMetrics(metrics)
 
 //     const overallTrend =
 //       sortedExams.length > 1
@@ -206,14 +280,24 @@
 //         average: Math.round(average * 100) / 100,
 //         trend,
 //         latest: scores[scores.length - 1]?.percentage || 0,
+//         dataPoints: scores.length
 //       }
 //     })
 
 //     const predictions = subjectAverages.map((subj) => {
-//       const predicted = subj.latest + subj.trend * 0.5
+//       const subjectMetrics = metrics[subj.subject]
+//       let predicted = subj.latest
+      
+//       if (subj.dataPoints > 1) {
+//         // Predict next value (current max index + 1)
+//         predicted = subjectMetrics.slope * subj.dataPoints + subjectMetrics.intercept
+//       }
+      
 //       return {
 //         ...subj,
 //         predicted: Math.min(100, Math.max(0, Math.round(predicted * 100) / 100)),
+//         r2: metrics[subj.subject]?.r2 || 0,
+//         mse: metrics[subj.subject]?.mse || 0
 //       }
 //     })
 
@@ -299,6 +383,18 @@
 //       commentary.push(`🔮 Predicted improvements in: ${improvingSubjects.map((s) => s.subject).join(", ")}`)
 //     }
 
+//     // Add regression quality metrics to commentary
+//     const highConfidenceSubjects = predictions.filter(subj => subj.r2 > 0.7)
+//     const lowConfidenceSubjects = predictions.filter(subj => subj.r2 > 0 && subj.r2 <= 0.4)
+    
+//     if (highConfidenceSubjects.length > 0) {
+//       commentary.push(`✅ High-confidence predictions (R² > 0.7) for: ${highConfidenceSubjects.map(s => s.subject).join(", ")}`)
+//     }
+    
+//     if (lowConfidenceSubjects.length > 0) {
+//       commentary.push(`⚠️ Low-confidence predictions (R² ≤ 0.4) for: ${lowConfidenceSubjects.map(s => s.subject).join(", ")}`)
+//     }
+
 //     return commentary.length > 0 ? commentary : ["No performance data available yet."]
 //   }
 
@@ -307,6 +403,12 @@
 //     if (percentage >= 80) return "from-blue-500 to-indigo-600"
 //     if (percentage >= 70) return "from-yellow-500 to-orange-600"
 //     return "from-red-500 to-pink-600"
+//   }
+
+//   const getConfidenceColor = (r2: number) => {
+//     if (r2 > 0.7) return "text-green-600"
+//     if (r2 > 0.4) return "text-yellow-600"
+//     return "text-red-600"
 //   }
 
 //   const TabButton = ({ tabKey, label, icon: Icon }) => (
@@ -541,6 +643,44 @@
 //                   <h3 className="text-2xl font-bold text-gray-900">Future Performance Analysis</h3>
 //                 </div>
 
+//                 <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
+//                   <h4 className="font-bold text-gray-800 mb-2">Regression Model Metrics</h4>
+//                   <p className="text-gray-700 text-sm">
+//                     Predictions use linear regression based on historical data. Metrics show model confidence:
+//                   </p>
+//                   <div className="grid grid-cols-3 gap-4 mt-3">
+//                     <div className="bg-white p-3 rounded-lg border">
+//                       <div className="text-sm text-gray-600">R² (Goodness of fit)</div>
+//                       <div className="text-lg font-bold">
+//                         {performanceAnalysis.predictions[0]?.r2 ? performanceAnalysis.predictions[0].r2.toFixed(2) : 'N/A'}
+//                       </div>
+//                       <div className="text-xs">
+//                         <span className={getConfidenceColor(performanceAnalysis.predictions[0]?.r2 || 0)}>
+//                           {performanceAnalysis.predictions[0]?.r2 > 0.7 
+//                             ? "High confidence" 
+//                             : performanceAnalysis.predictions[0]?.r2 > 0.4 
+//                               ? "Moderate confidence" 
+//                               : "Low confidence"}
+//                         </span>
+//                       </div>
+//                     </div>
+//                     <div className="bg-white p-3 rounded-lg border">
+//                       <div className="text-sm text-gray-600">MSE (Error)</div>
+//                       <div className="text-lg font-bold">
+//                         {performanceAnalysis.predictions[0]?.mse ? performanceAnalysis.predictions[0].mse.toFixed(1) : 'N/A'}
+//                       </div>
+//                       <div className="text-xs text-gray-500">Lower is better</div>
+//                     </div>
+//                     <div className="bg-white p-3 rounded-lg border">
+//                       <div className="text-sm text-gray-600">Data Points</div>
+//                       <div className="text-lg font-bold">
+//                         {performanceAnalysis.predictions[0]?.dataPoints || 'N/A'}
+//                       </div>
+//                       <div className="text-xs text-gray-500">Used for training</div>
+//                     </div>
+//                   </div>
+//                 </div>
+
 //                 <ResponsiveContainer width="100%" height={400}>
 //                   <BarChart data={performanceAnalysis.predictions} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
 //                     <defs>
@@ -564,6 +704,7 @@
 //                         boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
 //                       }}
 //                       formatter={(value) => [`${value}%`, "Score"]}
+//                       labelFormatter={(value) => `${value} Performance`}
 //                     />
 //                     <Legend />
 //                     <Bar
@@ -908,8 +1049,7 @@
 
 // export default StudentPerformanceDashboard
 
-"use client"
-
+import React from "react"
 import { useState, useMemo, useEffect } from "react"
 import {
   LineChart,
@@ -1024,10 +1164,11 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
     student: null,
   })
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState("overview")
   const [showPredictions, setShowPredictions] = useState(false)
-  const [regressionMetrics, setRegressionMetrics] = useState<Record<string, RegressionMetrics>>({})
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+  const [subjectPerformanceData, setSubjectPerformanceData] = useState<any>({})
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1122,6 +1263,102 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
     return { slope, intercept, r2, mse }
   }
 
+  // Calculate subject-wise performance data
+  useEffect(() => {
+    if (performanceData.exams.length > 0 || performanceData.quizzes.length > 0) {
+      const subjectData: Record<string, any> = {}
+      
+      // Process exam data
+      performanceData.exams.forEach(exam => {
+        if (!subjectData[exam.subject]) {
+          subjectData[exam.subject] = {
+            exams: [],
+            quizzes: [],
+            rechecking: [],
+            midterm: null,
+            final: null,
+            quizAverage: 0,
+            recheckingAverage: 0,
+            prediction: 0
+          }
+        }
+        
+        if (exam.percentage !== null) {
+          subjectData[exam.subject].exams.push({
+            type: exam.exam_type,
+            percentage: exam.percentage,
+            date: exam.created_at
+          })
+          
+          if (exam.exam_type === 'Midterm') {
+            subjectData[exam.subject].midterm = exam.percentage
+          } else if (exam.exam_type === 'Final') {
+            subjectData[exam.subject].final = exam.percentage
+          }
+        }
+      })
+      
+      // Process quiz data
+      performanceData.quizzes.forEach(quiz => {
+        if (subjectData[quiz.subject]) {
+          subjectData[quiz.subject].quizzes.push({
+            score: quiz.rubric,
+            date: quiz.date
+          })
+        }
+      })
+      
+      // Process rechecking data
+      performanceData.rechecking.forEach(recheck => {
+        if (subjectData[recheck.subjects]) {
+          const avg = (recheck.completeness + recheck.accuracy + recheck.clarity + recheck.feedback + recheck.presentation) / 5
+          subjectData[recheck.subjects].rechecking.push({
+            score: avg,
+            date: new Date().toISOString() // Use current date as placeholder
+          })
+          subjectData[recheck.subjects].recheckingAverage = avg
+        }
+      })
+      
+      // Calculate quiz averages
+      Object.keys(subjectData).forEach(subject => {
+        if (subjectData[subject].quizzes.length > 0) {
+          const total = subjectData[subject].quizzes.reduce((sum: number, quiz: any) => sum + quiz.score, 0)
+          subjectData[subject].quizAverage = total / subjectData[subject].quizzes.length
+        }
+      })
+      
+      // Calculate predictions
+      Object.keys(subjectData).forEach(subject => {
+        const data = subjectData[subject]
+        const factors = [
+          data.midterm || 0,
+          data.final || 0,
+          data.quizAverage * 10, // Convert 0-10 scale to 0-100
+          data.recheckingAverage * 10 // Convert 0-10 scale to 0-100
+        ].filter(val => val > 0)
+        
+        if (factors.length > 0) {
+          // Weighted average: midterm 30%, final 40%, quiz 20%, rechecking 10%
+          const weights = [0.3, 0.4, 0.2, 0.1]
+          let weightedSum = 0
+          let totalWeight = 0
+          
+          factors.forEach((val, index) => {
+            weightedSum += val * weights[index]
+            totalWeight += weights[index]
+          })
+          
+          data.prediction = Math.min(100, Math.max(0, Math.round((weightedSum / totalWeight) * 10) / 10))
+        } else {
+          data.prediction = 0
+        }
+      })
+      
+      setSubjectPerformanceData(subjectData)
+    }
+  }, [performanceData])
+
   const performanceAnalysis = useMemo(() => {
     const { exams, progressReports, quizzes, rechecking } = performanceData
 
@@ -1134,8 +1371,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
       timeIndex: number 
     }>> = {}
     
-    const metrics: Record<string, RegressionMetrics> = {}
-
     sortedExams.forEach((exam, index) => {
       if (!subjectPerformance[exam.subject]) {
         subjectPerformance[exam.subject] = []
@@ -1149,26 +1384,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
         })
       }
     })
-
-    // Calculate regression metrics for each subject
-    Object.keys(subjectPerformance).forEach(subject => {
-      const scores = subjectPerformance[subject]
-      if (scores.length > 1) {
-        const x = scores.map(s => s.timeIndex)
-        const y = scores.map(s => s.percentage)
-        metrics[subject] = calculateLinearRegression(x, y)
-      } else {
-        // Not enough data for regression
-        metrics[subject] = {
-          slope: 0,
-          intercept: scores.length ? scores[0].percentage : 0,
-          r2: 0,
-          mse: 0
-        }
-      }
-    })
-    
-    setRegressionMetrics(metrics)
 
     const overallTrend =
       sortedExams.length > 1
@@ -1192,23 +1407,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
         trend,
         latest: scores[scores.length - 1]?.percentage || 0,
         dataPoints: scores.length
-      }
-    })
-
-    const predictions = subjectAverages.map((subj) => {
-      const subjectMetrics = metrics[subj.subject]
-      let predicted = subj.latest
-      
-      if (subj.dataPoints > 1) {
-        // Predict next value (current max index + 1)
-        predicted = subjectMetrics.slope * subj.dataPoints + subjectMetrics.intercept
-      }
-      
-      return {
-        ...subj,
-        predicted: Math.min(100, Math.max(0, Math.round(predicted * 100) / 100)),
-        r2: metrics[subj.subject]?.r2 || 0,
-        mse: metrics[subj.subject]?.mse || 0
       }
     })
 
@@ -1240,7 +1438,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
 
     return {
       subjectAverages,
-      predictions,
       overallTrend: isNaN(overallTrend) ? 0 : overallTrend,
       behavioralScores,
       overallAverage:
@@ -1252,7 +1449,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
   }, [performanceData])
 
   const generateCommentary = () => {
-    const { overallAverage, overallTrend, predictions } = performanceAnalysis
+    const { overallAverage, overallTrend } = performanceAnalysis
 
     const commentary: string[] = []
 
@@ -1278,32 +1475,19 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
       commentary.push("➡️ Stable performance - maintaining consistent academic standards.")
     }
 
-    const strongSubjects = predictions.filter((subj) => subj.average >= 85)
-    const weakSubjects = predictions.filter((subj) => subj.average < 75)
+    const strongSubjects = Object.keys(subjectPerformanceData).filter(
+      subject => subjectPerformanceData[subject].prediction >= 85
+    )
+    const weakSubjects = Object.keys(subjectPerformanceData).filter(
+      subject => subjectPerformanceData[subject].prediction < 75
+    )
 
     if (strongSubjects.length > 0) {
-      commentary.push(`🌟 Strong performance in: ${strongSubjects.map((s) => s.subject).join(", ")}`)
+      commentary.push(`🌟 Strong performance predicted in: ${strongSubjects.join(", ")}`)
     }
 
     if (weakSubjects.length > 0) {
-      commentary.push(`📚 Areas needing attention: ${weakSubjects.map((s) => s.subject).join(", ")}`)
-    }
-
-    const improvingSubjects = predictions.filter((subj) => subj.predicted > subj.latest)
-    if (improvingSubjects.length > 0) {
-      commentary.push(`🔮 Predicted improvements in: ${improvingSubjects.map((s) => s.subject).join(", ")}`)
-    }
-
-    // Add regression quality metrics to commentary
-    const highConfidenceSubjects = predictions.filter(subj => subj.r2 > 0.7)
-    const lowConfidenceSubjects = predictions.filter(subj => subj.r2 > 0 && subj.r2 <= 0.4)
-    
-    if (highConfidenceSubjects.length > 0) {
-      commentary.push(`✅ High-confidence predictions (R² > 0.7) for: ${highConfidenceSubjects.map(s => s.subject).join(", ")}`)
-    }
-    
-    if (lowConfidenceSubjects.length > 0) {
-      commentary.push(`⚠️ Low-confidence predictions (R² ≤ 0.4) for: ${lowConfidenceSubjects.map(s => s.subject).join(", ")}`)
+      commentary.push(`📚 Areas needing attention: ${weakSubjects.join(", ")}`)
     }
 
     return commentary.length > 0 ? commentary : ["No performance data available yet."]
@@ -1314,12 +1498,6 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
     if (percentage >= 80) return "from-blue-500 to-indigo-600"
     if (percentage >= 70) return "from-yellow-500 to-orange-600"
     return "from-red-500 to-pink-600"
-  }
-
-  const getConfidenceColor = (r2: number) => {
-    if (r2 > 0.7) return "text-green-600"
-    if (r2 > 0.4) return "text-yellow-600"
-    return "text-red-600"
   }
 
   const TabButton = ({ tabKey, label, icon: Icon }) => (
@@ -1467,6 +1645,7 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
           <TabButton tabKey="trends" label="Trends" icon={TrendingUp} />
           <TabButton tabKey="subjects" label="Subjects" icon={BookOpen} />
           <TabButton tabKey="behavior" label="Behavior" icon={User} />
+          <TabButton tabKey="predictions" label="Predictions" icon={Brain} />
         </div>
 
         {/* Overview Tab */}
@@ -1474,166 +1653,91 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
           <div className="space-y-8">
             {/* Subject Performance Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {performanceAnalysis.subjectAverages.map((subject, index) => (
+              {Object.keys(subjectPerformanceData).map((subject, index) => (
                 <div
                   key={index}
                   className="group bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">{subject.subject}</h3>
+                    <h3 className="text-lg font-bold text-gray-900">{subject}</h3>
                     <div
-                      className={`p-2 rounded-xl ${subject.trend > 0 ? "bg-green-100" : subject.trend < 0 ? "bg-red-100" : "bg-gray-100"}`}
+                      className={`p-2 rounded-xl ${
+                        subjectPerformanceData[subject].prediction > 75
+                          ? "bg-green-100"
+                          : subjectPerformanceData[subject].prediction > 60
+                            ? "bg-yellow-100"
+                            : "bg-red-100"
+                      }`}
                     >
-                      {subject.trend > 0 ? (
+                      {subjectPerformanceData[subject].prediction > 75 ? (
                         <TrendingUp className="text-green-600" size={20} />
-                      ) : subject.trend < 0 ? (
-                        <TrendingDown className="text-red-600" size={20} />
+                      ) : subjectPerformanceData[subject].prediction > 60 ? (
+                        <Target className="text-yellow-600" size={20} />
                       ) : (
-                        <Target className="text-gray-600" size={20} />
+                        <TrendingDown className="text-red-600" size={20} />
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-600 font-medium">Current Score</span>
+                      <span className="text-gray-600 font-medium">Predicted Score</span>
                       <span
-                        className={`text-xl font-bold bg-gradient-to-r ${getGradeColor(subject.latest)} bg-clip-text text-transparent`}
+                        className={`text-xl font-bold bg-gradient-to-r ${getGradeColor(
+                          subjectPerformanceData[subject].prediction
+                        )} bg-clip-text text-transparent`}
                       >
-                        {subject.latest}%
+                        {subjectPerformanceData[subject].prediction}%
                       </span>
                     </div>
 
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full bg-gradient-to-r ${getGradeColor(subject.latest)} transition-all duration-500`}
-                        style={{ width: `${subject.latest}%` }}
+                        className={`h-2 rounded-full bg-gradient-to-r ${getGradeColor(
+                          subjectPerformanceData[subject].prediction
+                        )} transition-all duration-500`}
+                        style={{ width: `${subjectPerformanceData[subject].prediction}%` }}
                       ></div>
                     </div>
 
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">
-                        Average: <span className="font-semibold">{subject.average}%</span>
-                      </span>
-                      <span className="text-gray-600">
-                        Trend:{" "}
-                        <span
-                          className={`font-semibold ${subject.trend > 0 ? "text-green-600" : subject.trend < 0 ? "text-red-600" : "text-gray-600"}`}
-                        >
-                          {subject.trend > 0 ? "+" : ""}
-                          {subject.trend.toFixed(1)}%
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex flex-col">
+                        <span className="text-gray-600">Midterm</span>
+                        <span className="font-semibold">
+                          {subjectPerformanceData[subject].midterm
+                            ? `${subjectPerformanceData[subject].midterm}%`
+                            : "N/A"}
                         </span>
-                      </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-600">Final</span>
+                        <span className="font-semibold">
+                          {subjectPerformanceData[subject].final
+                            ? `${subjectPerformanceData[subject].final}%`
+                            : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-600">Quiz Avg</span>
+                        <span className="font-semibold">
+                          {subjectPerformanceData[subject].quizAverage
+                            ? `${Math.round(subjectPerformanceData[subject].quizAverage * 10)}/100`
+                            : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-gray-600">Rechecking</span>
+                        <span className="font-semibold">
+                          {subjectPerformanceData[subject].recheckingAverage
+                            ? `${Math.round(subjectPerformanceData[subject].recheckingAverage * 10)}/100`
+                            : "N/A"}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-
-            {/* Analyze Future Performance Button */}
-            <div className="flex justify-center">
-              <button
-                onClick={() => setShowPredictions(!showPredictions)}
-                className="group flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-              >
-                <Brain className="w-6 h-6" />
-                <span>Analyze Future Performance</span>
-                <div className={`transform transition-transform duration-300 ${showPredictions ? "rotate-180" : ""}`}>
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-              </button>
-            </div>
-
-            {/* Predictions Section */}
-            {showPredictions && (
-              <div className="bg-white rounded-2xl shadow-xl p-8 border border-purple-100 animate-in slide-in-from-top duration-500">
-                <div className="flex items-center space-x-3 mb-6">
-                  <div className="p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl">
-                    <Brain className="text-white" size={24} />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900">Future Performance Analysis</h3>
-                </div>
-
-                <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
-                  <h4 className="font-bold text-gray-800 mb-2">Regression Model Metrics</h4>
-                  <p className="text-gray-700 text-sm">
-                    Predictions use linear regression based on historical data. Metrics show model confidence:
-                  </p>
-                  <div className="grid grid-cols-3 gap-4 mt-3">
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm text-gray-600">R² (Goodness of fit)</div>
-                      <div className="text-lg font-bold">
-                        {performanceAnalysis.predictions[0]?.r2 ? performanceAnalysis.predictions[0].r2.toFixed(2) : 'N/A'}
-                      </div>
-                      <div className="text-xs">
-                        <span className={getConfidenceColor(performanceAnalysis.predictions[0]?.r2 || 0)}>
-                          {performanceAnalysis.predictions[0]?.r2 > 0.7 
-                            ? "High confidence" 
-                            : performanceAnalysis.predictions[0]?.r2 > 0.4 
-                              ? "Moderate confidence" 
-                              : "Low confidence"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm text-gray-600">MSE (Error)</div>
-                      <div className="text-lg font-bold">
-                        {performanceAnalysis.predictions[0]?.mse ? performanceAnalysis.predictions[0].mse.toFixed(1) : 'N/A'}
-                      </div>
-                      <div className="text-xs text-gray-500">Lower is better</div>
-                    </div>
-                    <div className="bg-white p-3 rounded-lg border">
-                      <div className="text-sm text-gray-600">Data Points</div>
-                      <div className="text-lg font-bold">
-                        {performanceAnalysis.predictions[0]?.dataPoints || 'N/A'}
-                      </div>
-                      <div className="text-xs text-gray-500">Used for training</div>
-                    </div>
-                  </div>
-                </div>
-
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={performanceAnalysis.predictions} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="currentGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.3} />
-                      </linearGradient>
-                      <linearGradient id="predictedGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#10B981" stopOpacity={0.3} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="subject" tick={{ fill: "#6B7280" }} />
-                    <YAxis domain={[0, 100]} tick={{ fill: "#6B7280" }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "none",
-                        borderRadius: "12px",
-                        boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-                      }}
-                      formatter={(value) => [`${value}%`, "Score"]}
-                      labelFormatter={(value) => `${value} Performance`}
-                    />
-                    <Legend />
-                    <Bar
-                      dataKey="latest"
-                      fill="url(#currentGradient)"
-                      name="Current Performance"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    <Bar
-                      dataKey="predicted"
-                      fill="url(#predictedGradient)"
-                      name="Predicted Performance"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
 
             {/* Performance Analysis Commentary */}
             <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
@@ -1709,121 +1813,341 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
         {/* Subjects Tab */}
         {activeTab === "subjects" && (
           <div className="space-y-8">
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div className="flex items-center space-x-3 mb-6">
-                <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
-                  <BookOpen className="text-white" size={24} />
+            {selectedSubject ? (
+              <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <button
+                  onClick={() => setSelectedSubject(null)}
+                  className="mb-6 flex items-center text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <span className="mr-2">&larr;</span> Back to Subjects
+                </button>
+                
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
+                    <BookOpen className="text-white" size={24} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">{selectedSubject} Performance</h3>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">Detailed Exam Results</h3>
-              </div>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="bg-gradient-to-r from-gray-50 to-blue-50">
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 rounded-tl-xl">Subject</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Exam Type</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Marks Obtained</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Total Marks</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Percentage</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700">Grade</th>
-                      <th className="px-6 py-4 text-left text-sm font-bold text-gray-700 rounded-tr-xl">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {performanceData.exams.map((exam, index) => (
-                      <tr key={index} className="hover:bg-gray-50 transition-colors duration-200">
-                        <td className="px-6 py-4 text-sm font-semibold text-gray-900">{exam.subject}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{exam.exam_type}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{exam.marks_obtained || "N/A"}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{exam.total_marks}</td>
-                        <td className="px-6 py-4 text-sm font-bold">
-                          {exam.percentage !== null ? (
-                            <span
-                              className={`bg-gradient-to-r ${getGradeColor(exam.percentage)} bg-clip-text text-transparent`}
-                            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                  <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl p-6 border border-gray-100">
+                    <h4 className="font-bold text-gray-900 mb-4 text-lg">Performance Metrics</h4>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Midterm", value: subjectPerformanceData[selectedSubject]?.midterm || "N/A" },
+                        { label: "Final", value: subjectPerformanceData[selectedSubject]?.final || "N/A" },
+                        { 
+                          label: "Quiz Average", 
+                          value: subjectPerformanceData[selectedSubject]?.quizAverage 
+                            ? `${Math.round(subjectPerformanceData[selectedSubject].quizAverage * 10)}/100` 
+                            : "N/A" 
+                        },
+                        { 
+                          label: "Rechecking Quality", 
+                          value: subjectPerformanceData[selectedSubject]?.recheckingAverage 
+                            ? `${Math.round(subjectPerformanceData[selectedSubject].recheckingAverage * 10)}/100` 
+                            : "N/A" 
+                        },
+                        { 
+                          label: "Predicted Score", 
+                          value: subjectPerformanceData[selectedSubject]?.prediction 
+                            ? `${subjectPerformanceData[selectedSubject].prediction}%` 
+                            : "N/A" 
+                        },
+                      ].map((metric, idx) => (
+                        <div key={idx} className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-gray-600">{metric.label}</span>
+                          <span className="text-sm font-bold text-gray-900">{metric.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-gradient-to-br from-gray-50 to-purple-50 rounded-2xl p-6 border border-gray-100">
+                    <h4 className="font-bold text-gray-900 mb-4 text-lg">Assessment History</h4>
+                    <div className="space-y-4 max-h-60 overflow-y-auto">
+                      {subjectPerformanceData[selectedSubject]?.exams.map((exam: any, idx: number) => (
+                        <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                          <div className="flex justify-between">
+                            <span className="font-medium">{exam.type}</span>
+                            <span className={`font-bold ${getGradeColor(exam.percentage).replace('bg-gradient-to-r', 'text')}`}>
                               {exam.percentage}%
                             </span>
-                          ) : (
-                            "N/A"
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          {exam.grade ? (
-                            <span
-                              className={`inline-flex px-3 py-1 text-xs font-bold rounded-full ${
-                                exam.grade.startsWith("A")
-                                  ? "bg-green-100 text-green-800"
-                                  : exam.grade.startsWith("B")
-                                    ? "bg-blue-100 text-blue-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                              }`}
-                            >
-                              {exam.grade}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(exam.date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {subjectPerformanceData[selectedSubject]?.quizzes.map((quiz: any, idx: number) => (
+                        <div key={idx} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Quiz</span>
+                            <span className="font-bold text-indigo-600">
+                              {quiz.score}/10
                             </span>
-                          ) : (
-                            "N/A"
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-700">
-                          {new Date(exam.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {performanceData.exams.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
-                    <BookOpen className="mx-auto mb-4 text-gray-300" size={48} />
-                    <p className="text-lg font-medium">No exam data available for this student</p>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(quiz.date).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
 
-            {/* Quiz Performance */}
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <div className="mb-8">
+                  <h4 className="font-bold text-gray-900 mb-4 text-lg">Performance Trend</h4>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={[
+                        { name: 'Midterm', value: subjectPerformanceData[selectedSubject]?.midterm || 0 },
+                        { name: 'Final', value: subjectPerformanceData[selectedSubject]?.final || 0 },
+                        { name: 'Quiz Avg', value: subjectPerformanceData[selectedSubject]?.quizAverage * 10 || 0 },
+                        { name: 'Rechecking', value: subjectPerformanceData[selectedSubject]?.recheckingAverage * 10 || 0 },
+                        { name: 'Predicted', value: subjectPerformanceData[selectedSubject]?.prediction || 0 },
+                      ]}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis dataKey="name" />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip 
+                        formatter={(value) => [`${value}%`, "Score"]}
+                        contentStyle={{
+                          backgroundColor: "white",
+                          border: "none",
+                          borderRadius: "12px",
+                          boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                        }}
+                      />
+                      <Bar 
+                        dataKey="value" 
+                        fill="#4F46E5" 
+                        name="Score"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
+                    <BookOpen className="text-white" size={24} />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900">Subject Performance</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {Object.keys(subjectPerformanceData).map((subject, index) => (
+                    <div
+                      key={index}
+                      onClick={() => setSelectedSubject(subject)}
+                      className="group bg-white rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold text-gray-900">{subject}</h3>
+                        <div
+                          className={`p-2 rounded-xl ${
+                            subjectPerformanceData[subject].prediction > 75
+                              ? "bg-green-100"
+                              : subjectPerformanceData[subject].prediction > 60
+                                ? "bg-yellow-100"
+                                : "bg-red-100"
+                          }`}
+                        >
+                          {subjectPerformanceData[subject].prediction > 75 ? (
+                            <TrendingUp className="text-green-600" size={20} />
+                          ) : subjectPerformanceData[subject].prediction > 60 ? (
+                            <Target className="text-yellow-600" size={20} />
+                          ) : (
+                            <TrendingDown className="text-red-600" size={20} />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-600 font-medium">Predicted Score</span>
+                          <span
+                            className={`text-xl font-bold bg-gradient-to-r ${getGradeColor(
+                              subjectPerformanceData[subject].prediction
+                            )} bg-clip-text text-transparent`}
+                          >
+                            {subjectPerformanceData[subject].prediction}%
+                          </span>
+                        </div>
+
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full bg-gradient-to-r ${getGradeColor(
+                              subjectPerformanceData[subject].prediction
+                            )} transition-all duration-500`}
+                            style={{ width: `${subjectPerformanceData[subject].prediction}%` }}
+                          ></div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="flex flex-col">
+                            <span className="text-gray-600">Midterm</span>
+                            <span className="font-semibold">
+                              {subjectPerformanceData[subject].midterm
+                                ? `${subjectPerformanceData[subject].midterm}%`
+                                : "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-600">Final</span>
+                            <span className="font-semibold">
+                              {subjectPerformanceData[subject].final
+                                ? `${subjectPerformanceData[subject].final}%`
+                                : "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-600">Quiz Avg</span>
+                            <span className="font-semibold">
+                              {subjectPerformanceData[subject].quizAverage
+                                ? `${Math.round(subjectPerformanceData[subject].quizAverage * 10)}/100`
+                                : "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-gray-600">Rechecking</span>
+                            <span className="font-semibold">
+                              {subjectPerformanceData[subject].recheckingAverage
+                                ? `${Math.round(subjectPerformanceData[subject].recheckingAverage * 10)}/100`
+                                : "N/A"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Predictions Tab */}
+        {activeTab === "predictions" && (
+          <div className="space-y-8">
+            <div className="bg-white rounded-2xl shadow-xl p-8 border border-purple-100">
               <div className="flex items-center space-x-3 mb-6">
-                <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
-                  <BarChart3 className="text-white" size={24} />
+                <div className="p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl">
+                  <Brain className="text-white" size={24} />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900">Quiz Performance</h3>
+                <h3 className="text-2xl font-bold text-gray-900">Performance Predictions</h3>
               </div>
 
-              {performanceData.quizzes.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={performanceData.quizzes}>
-                    <defs>
-                      <linearGradient id="quizGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.3} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="subject" tick={{ fill: "#6B7280" }} />
-                    <YAxis domain={[0, 10]} tick={{ fill: "#6B7280" }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "none",
-                        borderRadius: "12px",
-                        boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    <Bar
-                      dataKey="rubric"
-                      fill="url(#quizGradient)"
-                      name="Quiz Score (out of 10)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="text-center py-12 text-gray-500">
-                  <BarChart3 className="mx-auto mb-4 text-gray-300" size={48} />
-                  <p className="text-lg font-medium">No quiz data available for this student</p>
+              <div className="mb-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 border border-blue-100">
+                <h4 className="font-bold text-gray-800 mb-2">Prediction Methodology</h4>
+                <p className="text-gray-700 text-sm">
+                  Predictions are calculated using a weighted model that incorporates:
+                </p>
+                <div className="grid grid-cols-4 gap-4 mt-3">
+                  <div className="bg-white p-3 rounded-lg border text-center">
+                    <div className="text-sm text-gray-600">Midterm</div>
+                    <div className="text-lg font-bold">30%</div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border text-center">
+                    <div className="text-sm text-gray-600">Final</div>
+                    <div className="text-lg font-bold">40%</div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border text-center">
+                    <div className="text-sm text-gray-600">Quiz Avg</div>
+                    <div className="text-lg font-bold">20%</div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border text-center">
+                    <div className="text-sm text-gray-600">Rechecking</div>
+                    <div className="text-lg font-bold">10%</div>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart 
+                  data={Object.keys(subjectPerformanceData).map(subject => ({
+                    subject,
+                    prediction: subjectPerformanceData[subject].prediction,
+                    midterm: subjectPerformanceData[subject].midterm || 0,
+                    final: subjectPerformanceData[subject].final || 0,
+                    quiz: subjectPerformanceData[subject].quizAverage * 10 || 0,
+                    rechecking: subjectPerformanceData[subject].recheckingAverage * 10 || 0
+                  }))}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <defs>
+                    <linearGradient id="midtermGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="finalGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="quizGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="recheckingGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#EC4899" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#EC4899" stopOpacity={0.3} />
+                    </linearGradient>
+                    <linearGradient id="predictionGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
+                      <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.3} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="subject" tick={{ fill: "#6B7280" }} />
+                  <YAxis domain={[0, 100]} tick={{ fill: "#6B7280" }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "none",
+                      borderRadius: "12px",
+                      boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+                    }}
+                    formatter={(value) => [`${value}%`, "Score"]}
+                    labelFormatter={(value) => `${value} Performance`}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey="midterm"
+                    fill="url(#midtermGradient)"
+                    name="Midterm"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="final"
+                    fill="url(#finalGradient)"
+                    name="Final"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="quiz"
+                    fill="url(#quizGradient)"
+                    name="Quiz Avg"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="rechecking"
+                    fill="url(#recheckingGradient)"
+                    name="Rechecking"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="prediction"
+                    fill="url(#predictionGradient)"
+                    name="Prediction"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}

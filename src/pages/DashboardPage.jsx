@@ -131,15 +131,27 @@ export const DashboardPage = () => {
             </button>
             <button className="bg-green-100 hover:bg-green-200 text-green-800 p-4 rounded-lg flex flex-col items-center">
               <FaMoneyBillWave className="text-2xl mb-2" />
-              <span>Collect Fee</span>
+              <span>
+                <Link to="/fees">
+                  Collect Fee
+                </Link>
+              </span>
             </button>
             <button className="bg-yellow-100 hover:bg-yellow-200 text-yellow-800 p-4 rounded-lg flex flex-col items-center">
               <FaClock className="text-2xl mb-2" />
-              <span>Mark Attendance</span>
+              <span>
+                <Link to="/attendance">
+                  Mark Attendance
+                </Link>
+              </span>
             </button>
             <button className="bg-purple-100 hover:bg-purple-200 text-purple-800 p-4 rounded-lg flex flex-col items-center">
               <FaUsers className="text-2xl mb-2" />
-              <span>View Reports</span>
+              <span>
+                <Link to="/reports">
+                  View Reports
+                </Link>
+              </span>
             </button>
           </div>
         </div>
