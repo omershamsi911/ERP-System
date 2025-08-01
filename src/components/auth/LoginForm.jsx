@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { useNotification } from '../../hooks/useNotification';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 import { Navigate } from 'react-router-dom';
+import { TEST_CREDENTIALS } from '../../services/auth.service';
 
 export const LoginForm = () => {
   const [formData, setFormData] = useState({
@@ -13,8 +13,7 @@ export const LoginForm = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const { isAuthenticated, isLoading: authLoading, signIn } = useAuth();
-  const { showError, showSuccess } = useNotification();
+  const { isAuthenticated, loading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -73,42 +72,10 @@ export const LoginForm = () => {
     setLoading(true);
     
     try {
-      // Hardcoded admin credentials for testing
-      const ADMIN_EMAIL = 'admin@admin.com';
-      const ADMIN_PASSWORD = 'admin123';
-      
-      if (formData.email === ADMIN_EMAIL && formData.password === ADMIN_PASSWORD) {
-        // Simulate successful login with hardcoded admin
-        const mockAdminUser = {
-          id: 1,
-          email: ADMIN_EMAIL,
-          name: 'Admin User',
-          role: 'admin'
-        };
-        
-        // Store mock token and user data
-        localStorage.setItem('authToken', 'mock-admin-token-12345');
-        localStorage.setItem('user', JSON.stringify(mockAdminUser));
-        
-        // Call signIn with mock success result
-        const result = await signIn(formData.email, formData.password, true); // Pass true for mock mode
-        
-        showSuccess('Logged in successfully as Admin');
-        navigate('/dashboard');
-      } else {
-        // For non-admin credentials, try actual authentication
-        const result = await signIn(formData.email, formData.password);
-        
-        if (result.success) {
-          showSuccess('Logged in successfully');
-          navigate('/dashboard');
-        } else {
-          showError(result.error || 'Invalid credentials. Try admin@admin.com / admin123');
-        }
-      }
+      await signIn(formData.email, formData.password);
+      navigate('/dashboard');
     } catch (error) {
-      showError('An unexpected error occurred');
-      console.error('Login error:', error);
+      setErrors({ general: error.message || 'Login failed' });
     } finally {
       setLoading(false);
     }
@@ -117,8 +84,8 @@ export const LoginForm = () => {
   // Quick login function for testing
   const handleQuickLogin = () => {
     setFormData({
-      email: 'admin@admin.com',
-      password: 'admin123'
+      email: TEST_CREDENTIALS.email,
+      password: TEST_CREDENTIALS.password
     });
   };
 
@@ -137,8 +104,8 @@ export const LoginForm = () => {
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
             <p className="text-xs text-blue-800 text-center">
               <strong>Test Credentials:</strong><br />
-              Email: admin@admin.com<br />
-              Password: admin123
+              Email: {TEST_CREDENTIALS.email}<br />
+              Password: {TEST_CREDENTIALS.password}
             </p>
             <button
               type="button"
@@ -151,6 +118,12 @@ export const LoginForm = () => {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {errors.general && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {errors.general}
+            </div>
+          )}
+
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">

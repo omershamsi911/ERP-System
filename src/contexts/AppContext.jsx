@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppContext } from '../hooks/useApp';
+import { AppContext } from '../hooks/useApp.js';
 
 export const AppProvider = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

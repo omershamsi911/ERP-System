@@ -1,10 +1,15 @@
+// components/auth/PermissionRoute.jsx
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
 
-export const ProtectedRoute = ({ children, redirectTo = '/login' }) => {
-  const { isAuthenticated, loading } = useAuth();
+export const PermissionRoute = ({ 
+  children, 
+  requiredPermission,
+  redirectTo = '/dashboard' 
+}) => {
+  const { isAuthenticated, hasPermission, loading } = useAuth();
 
   if (loading) {
     return (
@@ -15,19 +20,12 @@ export const ProtectedRoute = ({ children, redirectTo = '/login' }) => {
   }
 
   if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (requiredPermission && !hasPermission(requiredPermission)) {
     return <Navigate to={redirectTo} replace />;
   }
 
   return children;
 };
-
-export const withAuth = (Component, redirectTo = '/login') => {
-  return function AuthenticatedComponent(props) {
-    return (
-      <ProtectedRoute redirectTo={redirectTo}>
-        <Component {...props} />
-      </ProtectedRoute>
-    );
-  };
-};
-

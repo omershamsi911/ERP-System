@@ -1,6 +1,6 @@
 import React from 'react';
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
-import {AuthProvider} from './contexts/AuthContext';
+import {AuthProvider} from './hooks/useAuth';
 import {AppProvider} from './contexts/AppContext';
 import {Layout} from './components/shared/Layout';
 import {DashboardPage} from "./pages/DashboardPage";
@@ -11,15 +11,19 @@ import AttendancePage from './pages/Attendace';
 import {ReportsPage} from './pages/ReportsPage';
 import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
 import {SettingsPage} from "./pages/SettingsPage";
-import {UsersPage} from "./pages/UsersPage";
+import UsersPage from "./pages/UsersPage";
 import {NotFoundPage} from "./pages/NotFoundPage";
 import AddStudentPage from "./pages/AddStudentPage";
 import { ViewStudentPage } from "./pages/ViewStudentPage";
 import { EditStudentPage } from "./pages/EditStudentPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import LoginForm from "./components/auth/LoginForm";
-import SignupForm from "./components/auth/SignupForm";
+import {LoginForm} from "./components/auth/LoginForm";
+import {SignupForm} from "./components/auth/SignupForm";
 import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
+import TeachersPage from './pages/TeachersPage';
+import {PermissionRoute} from './components/auth/PermissionRoute';
+
+
 import './styles/Report.css';
 function App() {
   return (
@@ -51,6 +55,7 @@ function App() {
                     <Route path="users" element={<UsersPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
+                    <Route path="teachers" element={<TeachersPage />} />
                   </Route>
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
