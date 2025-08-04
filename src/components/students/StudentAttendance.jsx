@@ -180,6 +180,7 @@ const StudentAttendanceSummary = ({ studentId }) => {
         {/* Student Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
+            
             <h2 className="text-xl font-bold text-gray-800">{attendanceData.student.fullname}</h2>
             <p className="text-gray-600">
               Roll #: {attendanceData.student.gr_number} • Class: {attendanceData.student.class}

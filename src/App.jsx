@@ -9,7 +9,7 @@ import {StudentPage} from "./pages/StudentPage";
 import FeesPage from './pages/FeesPage';
 import AttendancePage from './pages/Attendace';
 import {ReportsPage} from './pages/ReportsPage';
-import {AcademicCalenderPage} from "./pages/AcademicCalenderPage"
+import AcademicsPage from './pages/AcademicsPage';
 import {SettingsPage} from "./pages/SettingsPage";
 import UsersPage from "./pages/UsersPage";
 import {NotFoundPage} from "./pages/NotFoundPage";
@@ -21,10 +21,11 @@ import {LoginForm} from "./components/auth/LoginForm";
 import {SignupForm} from "./components/auth/SignupForm";
 import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
 import TeachersPage from './pages/TeachersPage';
-import {PermissionRoute} from './components/auth/PermissionRoute';
-
-
 import './styles/Report.css';
+import { StaffAttendance } from './components/teachers/StaffAttendance';
+
+
+
 function App() {
   return (
     <AuthProvider>
@@ -51,11 +52,12 @@ function App() {
                     <Route path="ProfileSettingsPage" element={<ProfileSettingsPage/>}/>
                     <Route path="fees" element={<FeesPage />} />
                     <Route path="attendance" element={<AttendancePage />} />
-                    <Route path="academic" element={<AcademicCalenderPage />} />
+                    <Route path="academic" element={<AcademicsPage />} />
                     <Route path="users" element={<UsersPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="teachers" element={<TeachersPage />} />
+                    <Route path="teachers" element={StaffAttendance} />
                   </Route>
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>

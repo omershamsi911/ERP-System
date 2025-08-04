@@ -16,6 +16,8 @@ export const TeachersPage = () => {
     return <LoadingSpinner />;
   }
 
+  console.log(user);
+
   const isSubjectTeacher = hasRole('Subject Teacher');
   const isClassTeacher = hasRole('Class Teacher');
   const isSuperAdmin = hasRole('Super Admin');
@@ -74,7 +76,8 @@ export const TeachersPage = () => {
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="font-semibold text-blue-900 mb-2">Your Roles:</h3>
         <div className="flex flex-wrap gap-2">
-          {user.roles?.map(role => (
+          {
+          user.roles?.map(role => (
             <span key={role} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
               {role}
             </span>
