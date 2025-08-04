@@ -427,17 +427,16 @@ const AttendancePage = () => {
         </div>
       </div>
       
-      {/* Edit/Create Modal */}
-      <div className={`fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center ${isModalOpen ? 'block' : 'hidden'}`}>
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
-          <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-xl font-bold text-gray-800">
-              {editingRecord ? 'Edit Attendance Record' : 'Add New Attendance Record'}
-            </h3>
-            <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
-              <X size={24} />
-            </button>
-          </div>
+      <div className={`fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center ${isModalOpen ? 'block' : 'hidden'}`}>
+  <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+    <div className="flex justify-between items-center p-4 border-b">
+      <h3 className="text-xl font-bold text-gray-800">
+        {editingRecord ? 'Edit Attendance Record' : 'Add New Attendance Record'}
+      </h3>
+      <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+        <X size={24} />
+      </button>
+    </div>
           <div className="p-6">
             <form onSubmit={handleSubmit}>
               <div className="mb-4">

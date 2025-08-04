@@ -20,11 +20,7 @@ const AdmissionReport = ({ startDate, endDate }) => {
             class,
             section,
             admission_date,
-            status,
-            families:family_id (
-              father_name,
-              contact_number
-            )
+            status
           `)
           .gte('admission_date', startDate)
           .lte('admission_date', endDate)
@@ -56,8 +52,8 @@ const AdmissionReport = ({ startDate, endDate }) => {
             <th>Student Name</th>
             <th>Class</th>
             <th>Section</th>
-            <th>Father's Name</th>
-            <th>Contact</th>
+            {/* <th>Father's Name</th> */}
+            {/* <th>Contact</th> */}
             <th>Status</th>
           </tr>
         </thead>
@@ -69,8 +65,8 @@ const AdmissionReport = ({ startDate, endDate }) => {
               <td>{student.fullname}</td>
               <td>{student.class}</td>
               <td>{student.section}</td>
-              <td>{student.families.father_name}</td>
-              <td>{student.families.contact_number}</td>
+              {/* <td>{student.families.father_name}</td> */}
+              {/* <td>{student.families.contact_number}</td> */}
               <td>{student.status}</td>
             </tr>
           ))}
