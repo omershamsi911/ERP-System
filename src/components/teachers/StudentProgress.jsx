@@ -8,43 +8,66 @@ export const StudentProgress = () => {
   const [loading, setLoading] = useState(false);
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
   const [progressData, setProgressData] = useState({});
   const [existingProgress, setExistingProgress] = useState([]);
 
   useEffect(() => {
-    loadClasses();
+    loadInitialData();
   }, []);
 
-  const loadClasses = async () => {
+  const loadInitialData = async () => {
     setLoading(true);
     try {
+      // Load classes
       const { data: classesData } = await supabase
         .from('classes')
         .select('*')
         .order('name');
       setClasses(classesData || []);
+
+      // Load sections
+      const { data: sectionsData } = await supabase
+        .from('sections')
+        .select('*')
+        .order('name');
+      setSections(sectionsData || []);
+
+      // Load subjects
+      const { data: subjectsData } = await supabase
+        .from('subjects')
+        .select('*')
+        .order('name');
+      setSubjects(subjectsData || []);
+
     } catch (error) {
-      console.error('Error loading classes:', error);
+      console.error('Error loading initial data:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const loadStudents = async () => {
-    if (!selectedClass) return;
+    if (!selectedClass || !selectedSection) return;
 
     setLoading(true);
     try {
       const { data: studentsData } = await supabase
         .from('students')
         .select('*')
-        .eq('class_id', selectedClass)
+        // .eq('class_id', selectedClass)
+        // .eq('section_id', selectedSection)
         .order('fullname');
       setStudents(studentsData || []);
 
       // Load existing progress data
-      await loadExistingProgress();
+      if (selectedSubject) {
+        await loadExistingProgress();
+      }
     } catch (error) {
       console.error('Error loading students:', error);
     } finally {
@@ -53,14 +76,15 @@ export const StudentProgress = () => {
   };
 
   const loadExistingProgress = async () => {
-    if (!selectedClass) return;
+    if (!selectedClass || !selectedSection || !selectedSubject) return;
 
     try {
-      // This would be based on your student_progress table structure
-      // For now, we'll use a mock structure
       const { data: progressData } = await supabase
         .from('student_progress_report')
         .select('*')
+        // .eq('class_id', selectedClass)
+        // .eq('section_id', selectedSection)
+        // .eq('subject', selectedSubject)
         .in('student_id', students.map(s => s.id));
 
       setExistingProgress(progressData || []);
@@ -73,7 +97,7 @@ export const StudentProgress = () => {
           homework_completion: record.homework_completion || 1,
           class_participation: record.class_participation || 1,
           behavior: record.behavior || 1,
-          overall_progress: record.overall_progress || 1
+          // overall_progress: record.overall_progress || 1
         };
       });
       setProgressData(progressMap);
@@ -84,7 +108,13 @@ export const StudentProgress = () => {
 
   useEffect(() => {
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, selectedSection]);
+
+  useEffect(() => {
+    if (selectedSubject && students.length > 0) {
+      loadExistingProgress();
+    }
+  }, [selectedSubject]);
 
   const handleProgressChange = (studentId, field, value) => {
     setProgressData(prev => ({
@@ -103,21 +133,24 @@ export const StudentProgress = () => {
     try {
       const progressRecords = students.map(student => ({
         student_id: student.id,
+        // class_id: selectedClass,
+        // section_id: selectedSection,
+        // subject: selectedSubject,
         uniform_compliance: progressData[student.id]?.uniform_compliance || 1,
         homework_completion: progressData[student.id]?.homework_completion || 1,
         class_participation: progressData[student.id]?.class_participation || 1,
         behavior: progressData[student.id]?.behavior || 1,
         // overall_progress: progressData[student.id]?.overall_progress || 1,
         date: new Date().toISOString().split('T')[0],
-        // teacher_id: user.id
       }));
 
-      // First, delete existing progress for this class
-      const studentIds = students.map(s => s.id);
+      // First, delete existing progress for this class/section/subject combination
       await supabase
         .from('student_progress_report')
         .delete()
-        .in('student_id', studentIds);
+        // .eq('class_id', selectedClass)
+        // .eq('section_id', selectedSection)
+        // .eq('subject', selectedSubject);
 
       // Insert new progress records
       const { error } = await supabase
@@ -165,23 +198,71 @@ export const StudentProgress = () => {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Student Progress Evaluation</h2>
-        <p className="text-gray-600">Evaluate student progress in various areas</p>
+        <p className="text-gray-600">Evaluate student progress in various areas by subject</p>
       </div>
 
       {/* Selection Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Class
           </label>
           <select
             value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
+            onChange={(e) => {
+              setSelectedClass(e.target.value);
+              setSelectedSection('');
+              setSelectedSubject('');
+              setStudents([]);
+              setProgressData({});
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            required
           >
             <option value="">Select Class</option>
             {classes.map(cls => (
               <option key={cls.id} value={cls.id}>{cls.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Section
+          </label>
+          <select
+            value={selectedSection}
+            onChange={(e) => {
+              setSelectedSection(e.target.value);
+              setSelectedSubject('');
+              setStudents([]);
+              setProgressData({});
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedClass}
+            required
+          >
+            <option value="">Select Section</option>
+            {sections.map(section => (
+              <option key={section.id} value={section.id}>{section.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Subject
+          </label>
+          <select
+            value={selectedSubject}
+            onChange={(e) => setSelectedSubject(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedSection}
+            required
+          >
+            <option value="">Select Subject</option>
+            {subjects.map(subject => (
+              <option key={subject.id} value={subject.name}>{subject.name}</option>
             ))}
           </select>
         </div>
@@ -196,16 +277,17 @@ export const StudentProgress = () => {
         </div>
       </div>
 
-      {selectedClass && students.length > 0 && (
+      {selectedClass && selectedSection && selectedSubject && students.length > 0 && (
         <div className="bg-white border rounded-lg">
           <form onSubmit={handleSubmit}>
             {/* Form Header */}
             <div className="p-4 border-b bg-gray-50">
               <h3 className="text-lg font-semibold">
-                Student Progress Evaluation
+                Progress Evaluation - {selectedSubject}
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Rate each student on a scale of 1-5 for different criteria
+                Class: {classes.find(c => c.id === selectedClass)?.name} - 
+                Section: {sections.find(s => s.id === selectedSection)?.name}
               </p>
             </div>
 
@@ -295,8 +377,8 @@ export const StudentProgress = () => {
                           Overall Progress
                         </label>
                         <select
-                          value={progressData[student.id]?.overall_progress || 1}
-                          onChange={(e) => handleProgressChange(student.id, 'overall_progress', e.target.value)}
+                          // value={progressData[student.id]?.overall_progress || 1}
+                          // onChange={(e) => handleProgressChange(student.id, 'overall_progress', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                         >
                           {[1, 2, 3, 4, 5].map(rating => (
@@ -348,4 +430,4 @@ export const StudentProgress = () => {
       )}
     </div>
   );
-}; 
+};
