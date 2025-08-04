@@ -40,7 +40,7 @@ export const StudentProgress = () => {
         .from('students')
         .select('*')
         .eq('class_id', selectedClass)
-        .order('full_name');
+        .order('fullname');
       setStudents(studentsData || []);
 
       // Load existing progress data
@@ -59,7 +59,7 @@ export const StudentProgress = () => {
       // This would be based on your student_progress table structure
       // For now, we'll use a mock structure
       const { data: progressData } = await supabase
-        .from('student_progress')
+        .from('student_progress_report')
         .select('*')
         .in('student_id', students.map(s => s.id));
 
@@ -107,21 +107,21 @@ export const StudentProgress = () => {
         homework_completion: progressData[student.id]?.homework_completion || 1,
         class_participation: progressData[student.id]?.class_participation || 1,
         behavior: progressData[student.id]?.behavior || 1,
-        overall_progress: progressData[student.id]?.overall_progress || 1,
-        evaluation_date: new Date().toISOString().split('T')[0],
-        teacher_id: user.id
+        // overall_progress: progressData[student.id]?.overall_progress || 1,
+        date: new Date().toISOString().split('T')[0],
+        // teacher_id: user.id
       }));
 
       // First, delete existing progress for this class
       const studentIds = students.map(s => s.id);
       await supabase
-        .from('student_progress')
+        .from('student_progress_report')
         .delete()
         .in('student_id', studentIds);
 
       // Insert new progress records
       const { error } = await supabase
-        .from('student_progress')
+        .from('student_progress_report')
         .insert(progressRecords);
 
       if (error) throw error;
@@ -214,7 +214,7 @@ export const StudentProgress = () => {
               <div className="space-y-6">
                 {students.map(student => (
                   <div key={student.id} className="border rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-4">{student.full_name}</h4>
+                    <h4 className="font-medium text-gray-900 mb-4">{student.fullname}</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       {/* Uniform Compliance */}

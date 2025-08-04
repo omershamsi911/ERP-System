@@ -9,7 +9,9 @@ export const RecheckingSchedule = () => {
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [evaluations, setEvaluations] = useState({});
 
@@ -34,6 +36,13 @@ export const RecheckingSchedule = () => {
         .order('name');
       setClasses(classesData || []);
 
+      // Load sections
+      const { data: sectionsData } = await supabase
+        .from('sections')
+        .select('*')
+        .order('name');
+      setSections(sectionsData || []);
+
     } catch (error) {
       console.error('Error loading initial data:', error);
     } finally {
@@ -42,7 +51,7 @@ export const RecheckingSchedule = () => {
   };
 
   const loadStudents = async () => {
-    if (!selectedClass) return;
+    if (!selectedClass || !selectedSection) return;
 
     setLoading(true);
     try {
@@ -50,7 +59,8 @@ export const RecheckingSchedule = () => {
         .from('students')
         .select('*')
         .eq('class_id', selectedClass)
-        .order('full_name');
+        .eq('section_id', selectedSection)
+        .order('fullname');
       setStudents(studentsData || []);
     } catch (error) {
       console.error('Error loading students:', error);
@@ -61,7 +71,7 @@ export const RecheckingSchedule = () => {
 
   useEffect(() => {
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, selectedSection]);
 
   const handleEvaluationChange = (studentId, field, value) => {
     setEvaluations(prev => ({
@@ -80,12 +90,14 @@ export const RecheckingSchedule = () => {
     try {
       const evaluationRecords = students.map(student => ({
         student_id: student.id,
-        subjects: selectedSubject,
+        subject: selectedSubject,
         completeness: evaluations[student.id]?.completeness || 1,
         accuracy: evaluations[student.id]?.accuracy || 1,
         clarity: evaluations[student.id]?.clarity || 1,
         feedback: evaluations[student.id]?.feedback || 1,
-        presentation: evaluations[student.id]?.presentation || 1
+        presentation: evaluations[student.id]?.presentation || 1,
+        class_id: selectedClass,
+        section_id: selectedSection
       }));
 
       const { error } = await supabase
@@ -126,19 +138,49 @@ export const RecheckingSchedule = () => {
       </div>
 
       {/* Selection Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Class
           </label>
           <select
             value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
+            onChange={(e) => {
+              setSelectedClass(e.target.value);
+              setSelectedSection('');
+              setSelectedSubject('');
+              setStudents([]);
+              setEvaluations({});
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            required
           >
             <option value="">Select Class</option>
             {classes.map(cls => (
               <option key={cls.id} value={cls.id}>{cls.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Section
+          </label>
+          <select
+            value={selectedSection}
+            onChange={(e) => {
+              setSelectedSection(e.target.value);
+              setSelectedSubject('');
+              setStudents([]);
+              setEvaluations({});
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedClass}
+            required
+          >
+            <option value="">Select Section</option>
+            {sections.map(section => (
+              <option key={section.id} value={section.id}>{section.name}</option>
             ))}
           </select>
         </div>
@@ -151,6 +193,8 @@ export const RecheckingSchedule = () => {
             value={selectedSubject}
             onChange={(e) => setSelectedSubject(e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedSection}
+            required
           >
             <option value="">Select Subject</option>
             {subjects.map(subject => (
@@ -160,7 +204,7 @@ export const RecheckingSchedule = () => {
         </div>
       </div>
 
-      {selectedClass && selectedSubject && students.length > 0 && (
+      {selectedClass && selectedSection && selectedSubject && students.length > 0 && (
         <div className="bg-white border rounded-lg">
           <form onSubmit={handleSubmit}>
             {/* Form Header */}
@@ -169,7 +213,8 @@ export const RecheckingSchedule = () => {
                 Rechecking Evaluations - {selectedSubject}
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                Rate each student on a scale of 1-5 for different criteria
+                Class: {classes.find(c => c.id === selectedClass)?.name} - 
+                Section: {sections.find(s => s.id === selectedSection)?.name}
               </p>
             </div>
 
@@ -178,7 +223,7 @@ export const RecheckingSchedule = () => {
               <div className="space-y-4">
                 {students.map(student => (
                   <div key={student.id} className="border rounded-lg p-4">
-                    <h4 className="font-medium text-gray-900 mb-3">{student.full_name}</h4>
+                    <h4 className="font-medium text-gray-900 mb-3">{student.fullname}</h4>
                     
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       {/* Completeness */}
@@ -302,4 +347,4 @@ export const RecheckingSchedule = () => {
       )}
     </div>
   );
-}; 
+};

@@ -9,24 +9,25 @@ export const InputMarks = () => {
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [termDetails, setTermDetails] = useState([]); // New state for term details
-  const [terms, setTerms] = useState([]); // New state for terms
+  const [sections, setSections] = useState([]);
+  const [termDetails, setTermDetails] = useState([]);
+  const [terms, setTerms] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [markType, setMarkType] = useState('exam'); // 'exam' or 'quiz'
-  const [marks, setMarks] = useState({});
+  const [markType, setMarkType] = useState('exam');
+  const [studentMarks, setStudentMarks] = useState([]);
 
   // Exam form state
   const [examData, setExamData] = useState({
     exam_type: '',
-    total_marks: '', 
-    term_details_id: '' // This will now be set dynamically
+    total_marks: '',
+    term_details_id: '',
+    date: new Date().toISOString().split('T')[0]
   });
 
   // Quiz form state
   const [quizData, setQuizData] = useState({
-    cp: 'Excellent',
-    rubrics: 5,
     date: new Date().toISOString().split('T')[0]
   });
 
@@ -37,21 +38,28 @@ export const InputMarks = () => {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      // Load subjects (this would be based on teacher's assigned subjects)
+      // Load subjects
       const { data: subjectsData } = await supabase
         .from('subjects')
         .select('*')
         .order('name');
       setSubjects(subjectsData || []);
 
-      // Load classes (this would be based on teacher's assigned classes)
+      // Load classes
       const { data: classesData } = await supabase
         .from('classes')
         .select('*')
         .order('name');
       setClasses(classesData || []);
 
-      // Load terms first
+      // Load sections
+      const { data: sectionsData } = await supabase
+        .from('sections')
+        .select('*')
+        .order('name');
+      setSections(sectionsData || []);
+
+      // Load terms
       const { data: termsData } = await supabase
         .from('terms')
         .select('id, name')
@@ -63,7 +71,6 @@ export const InputMarks = () => {
         .from('term_details')
         .select('id, term_id, subject, subject_id')
         .order('term_id');
-      console.log("termDetailsData", termDetailsData);
       setTermDetails(termDetailsData || []);
 
     } catch (error) {
@@ -74,7 +81,7 @@ export const InputMarks = () => {
   };
 
   const loadStudents = async () => {
-    if (!selectedClass) return;
+    if (!selectedClass || !selectedSection) return;
 
     setLoading(true);
     try {
@@ -82,8 +89,20 @@ export const InputMarks = () => {
         .from('students')
         .select('*')
         .eq('class_id', selectedClass)
+        .eq('section_id', selectedSection)
         .order('fullname');
+
+      // Initialize student marks array
+      const initialMarks = studentsData.map(student => ({
+        student_id: student.id,
+        student_name: student.fullname,
+        marks: '',
+        cp: 'Excellent',
+        rubric: 5
+      }));
+
       setStudents(studentsData || []);
+      setStudentMarks(initialMarks);
     } catch (error) {
       console.error('Error loading students:', error);
     } finally {
@@ -91,7 +110,6 @@ export const InputMarks = () => {
     }
   };
 
-  // New function to get term details ID based on selected subject and term ID
   const getTermDetailsId = (subjectName, termId) => {
     const termDetail = termDetails.find(td => 
       td.subject === subjectName && td.term_id === termId
@@ -99,10 +117,8 @@ export const InputMarks = () => {
     return termDetail ? termDetail.id : '';
   };
 
-  // Update examData when subject changes
   useEffect(() => {
     if (selectedSubject && termDetails.length > 0 && terms.length > 0) {
-      // Get the first available term for the selected subject
       const availableTermDetails = termDetails.filter(td => td.subject === selectedSubject);
       if (availableTermDetails.length > 0) {
         const firstTermDetail = availableTermDetails[0];
@@ -116,31 +132,49 @@ export const InputMarks = () => {
 
   useEffect(() => {
     loadStudents();
-  }, [selectedClass]);
+  }, [selectedClass, selectedSection]);
 
-  const handleMarkChange = (studentId, value) => {
-    setMarks(prev => ({
-      ...prev,
-      [studentId]: value
-    }));
+  const handleStudentMarkChange = (index, field, value) => {
+    setStudentMarks(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
+      return updated;
+    });
   };
 
   const handleExamSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
+    // Validate all marks are within range
+    const invalidMarks = studentMarks.some(mark => {
+      const marksValue = parseInt(mark.marks);
+      return isNaN(marksValue) || marksValue < 0 || marksValue > parseInt(examData.total_marks);
+    });
+
+    if (invalidMarks) {
+      alert(`Please ensure all marks are between 0 and ${examData.total_marks}`);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const examRecords = students.map(student => ({
-        student_id: student.id,
+      const examRecords = studentMarks.map(mark => ({
+        student_id: mark.student_id,
         exam_type: examData.exam_type,
         subject: selectedSubject,
         total_marks: parseInt(examData.total_marks),
-        marks_obtained: parseInt(marks[student.id] || 0),
-        percentage: marks[student.id] ? (parseInt(marks[student.id]) / parseInt(examData.total_marks)) * 100 : 0,
-        grade: calculateGrade(marks[student.id] ? (parseInt(marks[student.id]) / parseInt(examData.total_marks)) * 100 : 0),
-        term_details_id: examData.term_details_id // Now dynamically set
+        marks_obtained: parseInt(mark.marks) || 0,
+        percentage: mark.marks ? 
+          (parseInt(mark.marks) / parseInt(examData.total_marks)) * 100 : 0,
+        grade: calculateGrade(mark.marks ? 
+          (parseInt(mark.marks) / parseInt(examData.total_marks)) * 100 : 0),
+        term_details_id: examData.term_details_id,
+        date: examData.date
       }));
-
 
       const { error } = await supabase
         .from('exams')
@@ -149,8 +183,13 @@ export const InputMarks = () => {
       if (error) throw error;
 
       alert('Exam marks saved successfully!');
-      setMarks({});
-      setExamData({ exam_type: '', total_marks: '', term_details_id: examData.term_details_id });
+      setExamData(prev => ({
+        exam_type: '',
+        total_marks: '',
+        term_details_id: prev.term_details_id,
+        date: new Date().toISOString().split('T')[0]
+      }));
+      setStudentMarks(prev => prev.map(m => ({ ...m, marks: '' })));
 
     } catch (error) {
       console.error('Error saving exam marks:', error);
@@ -164,12 +203,24 @@ export const InputMarks = () => {
     e.preventDefault();
     setLoading(true);
 
+    // Validate all rubrics are within range (1-5)
+    const invalidRubrics = studentMarks.some(mark => {
+      const rubricValue = parseInt(mark.rubric);
+      return isNaN(rubricValue) || rubricValue < 1 || rubricValue > 5;
+    });
+
+    if (invalidRubrics) {
+      alert('Please ensure all rubrics are between 1 and 5');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const quizRecords = students.map(student => ({
-        student_id: student.id,
+      const quizRecords = studentMarks.map(mark => ({
+        student_id: mark.student_id,
         subject: selectedSubject,
-        cp: quizData.cp,
-        rubrics: quizData.rubrics,
+        cp: mark.cp,
+        rubric: mark.rubric,
         date: quizData.date
       }));
 
@@ -180,7 +231,14 @@ export const InputMarks = () => {
       if (error) throw error;
 
       alert('Quiz marks saved successfully!');
-      setQuizData({ cp: 'Excellent', rubrics: 5, date: new Date().toISOString().split('T')[0] });
+      setQuizData({
+        date: new Date().toISOString().split('T')[0]
+      });
+      setStudentMarks(prev => prev.map(m => ({ 
+        ...m, 
+        rubric: 5,
+        cp: 'Excellent'
+      })));
 
     } catch (error) {
       console.error('Error saving quiz marks:', error);
@@ -199,18 +257,11 @@ export const InputMarks = () => {
     return 'F';
   };
 
-  // Get available terms for the selected subject
   const getAvailableTerms = () => {
-    console.log("terms", terms);
-    console.log("termDetails", termDetails);
     if (!selectedSubject || terms.length === 0 || termDetails.length === 0) return [];
     
-    // Get term_details for the selected subject
     const subjectTermDetails = termDetails.filter(td => td.subject === selectedSubject);
-    console.log("selectedSubject", selectedSubject);
-    console.log("termDetails", termDetails);
-    console.log("subjectTermDetails", subjectTermDetails);  
-    // Map to terms with names
+    
     return subjectTermDetails.map(td => {
       const term = terms.find(t => t.id === td.term_id);
       return {
@@ -246,15 +297,22 @@ export const InputMarks = () => {
       </div>
 
       {/* Selection Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Class
           </label>
           <select
             value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
+            onChange={(e) => {
+              setSelectedClass(e.target.value);
+              setSelectedSection('');
+              setSelectedSubject('');
+              // setStudents([]);
+              // setStudentMarks([]);
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            required
           >
             <option value="">Select Class</option>
             {classes.map(cls => (
@@ -265,12 +323,41 @@ export const InputMarks = () => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
+            Section
+          </label>
+          <select
+            value={selectedSection}
+            onChange={(e) => {
+              setSelectedSection(e.target.value);
+              setSelectedSubject('');
+              // setStudents([]);
+              // setStudentMarks([]);
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedClass}
+            required
+          >
+            <option value="">Select Section</option>
+            {sections.map(section => (
+              <option key={section.id} value={section.id}>{section.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
             Subject
           </label>
           <select
             value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
+            onChange={(e) => {
+              setSelectedSubject(e.target.value);
+              // setStudents([]);
+              // setStudentMarks([]);
+            }}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            disabled={!selectedSection}
+            required
           >
             <option value="">Select Subject</option>
             {subjects.map(subject => (
@@ -289,7 +376,7 @@ export const InputMarks = () => {
         </div>
       </div>
 
-      {selectedClass && selectedSubject && students.length > 0 && (
+      {selectedClass && selectedSection && selectedSubject && students.length > 0 && (
         <div className="bg-white border rounded-lg">
           <form onSubmit={markType === 'exam' ? handleExamSubmit : handleQuizSubmit}>
             {/* Form Header */}
@@ -322,6 +409,7 @@ export const InputMarks = () => {
                     </label>
                     <input
                       type="number"
+                      min="1"
                       value={examData.total_marks}
                       onChange={(e) => setExamData(prev => ({ ...prev, total_marks: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -354,47 +442,19 @@ export const InputMarks = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Term Details ID
-                    </label>
-                    <div className="px-3 py-2 bg-gray-100 rounded-md text-sm text-gray-600">
-                      {examData.term_details_id || 'Auto-selected'}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      CP Grade
-                    </label>
-                    <select
-                      value={quizData.cp}
-                      onChange={(e) => setQuizData(prev => ({ ...prev, cp: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="Excellent">Excellent</option>
-                      <option value="A">A</option>
-                      <option value="Fair">Fair</option>
-                      <option value="V. Good">V. Good</option>
-                      <option value="Satisfactory">Satisfactory</option>
-                      <option value="Unsatisfactory">Unsatisfactory</option>
-                      <option value="Zero">Zero</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Rubrics (1-5)
+                      Date
                     </label>
                     <input
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={quizData.rubrics}
-                      onChange={(e) => setQuizData(prev => ({ ...prev, rubrics: parseInt(e.target.value) }))}
+                      type="date"
+                      value={examData.date}
+                      onChange={(e) => setExamData(prev => ({ ...prev, date: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                       required
                     />
                   </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 mb-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Date
@@ -411,33 +471,87 @@ export const InputMarks = () => {
               )}
 
               {/* Students List */}
-              <div className="space-y-2">
-                <h4 className="font-medium text-gray-900">Students</h4>
-                {students.map(student => (
-                  <div key={student.id} className="flex items-center justify-between p-3 border rounded">
-                    <span className="font-medium">{student.fullname}</span>
-                    {markType === 'exam' ? (
-                      <input
-                        type="number"
-                        min="0"
-                        max={examData.total_marks || 100}
-                        value={marks[student.id] || ''}
-                        onChange={(e) => handleMarkChange(student.id, e.target.value)}
-                        className="w-24 px-3 py-1 border border-gray-300 rounded text-center"
-                        placeholder="Marks"
-                      />
-                    ) : (
-                      <span className="text-sm text-gray-600">
-                        CP: {quizData.cp} | Rubrics: {quizData.rubrics}
-                      </span>
-                    )}
-                  </div>
-                ))}
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-900">Students Marks</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Student Name
+                        </th>
+                        {markType === 'exam' ? (
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Marks (Max: {examData.total_marks || 'Not set'})
+                          </th>
+                        ) : (
+                          <>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              CP Grade
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Rubric (1-5)
+                            </th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {studentMarks.map((mark, index) => (
+                        <tr key={mark.student_id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {mark.student_name}
+                          </td>
+                          {markType === 'exam' ? (
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="number"
+                                min="0"
+                                max={examData.total_marks || 100}
+                                value={mark.marks}
+                                onChange={(e) => handleStudentMarkChange(index, 'marks', e.target.value)}
+                                className="w-24 px-3 py-1 border border-gray-300 rounded text-center"
+                                placeholder="0"
+                                disabled={!examData.total_marks}
+                                required
+                              />
+                            </td>
+                          ) : (
+                            <>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  value={mark.cp}
+                                  onChange={(e) => handleStudentMarkChange(index, 'cp', e.target.value)}
+                                  className="w-32 px-3 py-1 border border-gray-300 rounded"
+                                  placeholder="CP Grade"
+                                  required
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  value={mark.rubric}
+                                  onChange={(e) => handleStudentMarkChange(index, 'rubric', e.target.value)}
+                                  className="w-24 px-3 py-1 border border-gray-300 rounded text-center"
+                                  placeholder="1-5"
+                                  required
+                                />
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
             {/* Submit Button */}
-            <div className="p-4 border-t bg-gray-50">
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
               <button
                 type="submit"
                 disabled={loading}
