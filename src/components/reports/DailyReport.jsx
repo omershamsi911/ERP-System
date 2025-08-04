@@ -46,7 +46,6 @@ const DailyReport = ({ date }) => {
             id,
             amount_paid,
             payment_method,
-            receipt_number,
             student_fees:student_fee_id (
               student_id,
               students:student_id (fullname, gr_number, class, section)
@@ -70,7 +69,17 @@ const DailyReport = ({ date }) => {
           .select(`
             id,
             status,
-            users:staff_id (full_name, role)
+            staff_id,
+            users (
+              id,
+              user_roles (
+                role_id,
+                roles (
+                  id,
+                  name
+                )
+              )
+            )
           `)
           .eq('attendance_date', date);
 
@@ -441,9 +450,6 @@ const DailyReport = ({ date }) => {
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Method
                         </th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Receipt
-                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -466,9 +472,6 @@ const DailyReport = ({ date }) => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">
                             {payment.payment_method.replace(/_/g, ' ')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {payment.receipt_number || 'N/A'}
                           </td>
                         </motion.tr>
                       ))}

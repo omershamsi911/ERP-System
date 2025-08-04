@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { motion } from 'framer-motion';
+
 import { 
   FiLoader, 
   FiDollarSign, 
@@ -33,23 +34,13 @@ const MonthlyFeesReport = ({ month, year }) => {
         const { data: payments, error: paymentsError } = await supabase
           .from('student_fee_payments')
           .select(`
-            id,
-            amount_paid,
-            payment_date,
-            payment_method,
-            receipt_number,
-            student_fees (
-              student_id,
-              fee_type,
-              total_amount,
-              discount_amount,
-              fine_amount,
-              students(fullname, class, section, gr_number),
-              fee_categories(id, name)
+            *
           `)
           .gte('payment_date', startDate)
           .lte('payment_date', endDate)
           .order('payment_date', { ascending: false });
+
+          console.log(payments);
 
         if (paymentsError) throw paymentsError;
 
@@ -385,12 +376,6 @@ const MonthlyFeesReport = ({ month, year }) => {
                             >
                               <td colSpan="5" className="px-6 py-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  <div>
-                                    <h4 className="text-sm font-medium text-gray-500">Receipt Number</h4>
-                                    <p className="mt-1 text-sm text-gray-900">
-                                      {payment.receipt_number || 'N/A'}
-                                    </p>
-                                  </div>
                                   <div>
                                     <h4 className="text-sm font-medium text-gray-500">Fee Breakdown</h4>
                                     <div className="mt-1 grid grid-cols-2 gap-2 text-sm">

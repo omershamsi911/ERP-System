@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { motion } from 'framer-motion';
+
 import { FiLoader, FiDollarSign, FiCreditCard, FiCalendar, FiUser, FiBook, FiPercent, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 
 const FeesReport = ({ startDate, endDate }) => {
@@ -19,7 +20,6 @@ const FeesReport = ({ startDate, endDate }) => {
             amount_paid,
             payment_date,
             payment_method,
-            receipt_number,
             student_fees (
               student_id,
               fee_type,
@@ -34,6 +34,7 @@ const FeesReport = ({ startDate, endDate }) => {
           .order('payment_date', { ascending: false });
 
         if (error) throw error;
+        
         setFeesData(data);
       } catch (error) {
         console.error('Error fetching fees data:', error);

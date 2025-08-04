@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
+import { motion } from 'framer-motion';
 
 
 const IncomeReport = ({ startDate, endDate }) => {
@@ -19,7 +20,7 @@ const IncomeReport = ({ startDate, endDate }) => {
             amount_paid,
             payment_date,
             payment_method,
-            student_fees:student_fees_id (
+            student_fees:student_fee_id (
               fee_category_id,
               fee_categories:fee_category_id (name)
             )
@@ -28,13 +29,9 @@ const IncomeReport = ({ startDate, endDate }) => {
           .lte('payment_date', endDate);
 
         // Fetch other income (you would need to add this table)
-        const { data: otherIncome, error: incomeError } = await supabase
-          .from('other_income')
-          .select('*')
-          .gte('date', startDate)
-          .lte('date', endDate);
+        const otherIncome = 0;
 
-        if (feeError || incomeError) throw feeError || incomeError;
+        // if (feeError || incomeError) throw feeError || incomeError;
 
         // Combine data
         const combinedData = [

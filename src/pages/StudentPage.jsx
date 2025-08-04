@@ -87,6 +87,7 @@ export const StudentPage = () => {
     { Header: 'Remarks', accessor: 'remarks' }
   ];
 
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <div className="bg-gray-800 text-white p-6 flex flex-col md:flex-row justify-between items-start md:items-center">
@@ -240,6 +241,7 @@ export const StudentPage = () => {
             {!feesLoading && !feesError && (
               fees.length > 0 ? (
                 <DataTable 
+
                   columns={feeColumns} 
                   data={fees} 
                 />

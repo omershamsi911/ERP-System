@@ -20,7 +20,7 @@ const CollectionReport = ({ startDate, endDate }) => {
             payment_method,
             received_by,
             users:received_by (full_name),
-            student_fees:student_fees_id (
+            student_fees:student_fee_id (
               student_id,
               students:student_id (fullname, gr_number, class)
             )

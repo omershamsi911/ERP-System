@@ -34,7 +34,7 @@ const WeeklyReport = ({ startDate, endDate }) => {
             id,
             amount_paid,
             payment_date,
-            student_fees:student_fees_id (
+            student_fees:student_fee_id (
               student_id,
               students:student_id (fullname, class, gr_number)
             )

@@ -35,6 +35,7 @@ const StudentFeeStatus = ({ studentId }) => {
           .filter('due_date', 'lte', `${currentYear}-${String(currentMonth).padStart(2, '0')}-31`);
         
         if (feeError) throw feeError;
+
         
         // Determine overall status
         let overallStatus = 'no-fees';
