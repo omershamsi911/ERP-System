@@ -3,7 +3,6 @@ import { useFees } from "../hooks/useFees";
 import { useAttendance } from "../hooks/useAttendance";
 import { useStudents } from "../hooks/useStudents";
 import { StatsCard } from "../components/dashboard/StatsCard";
-import { RecentActivity } from "../components/dashboard/RecentActivity";
 import {
   FaUserGraduate,
   FaMoneyBillWave,
@@ -21,7 +20,7 @@ export const DashboardPage = () => {
     attendanceRate: 0,
   });
 
-  const [recentActivity, setRecentActivity] = useState([]);
+  // const [recentActivity, setRecentActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -61,27 +60,27 @@ export const DashboardPage = () => {
         });
 
         // Generate recent activity from actual data
-        const activities = [
-          {
-            icon: <FaUserGraduate />,
-            title: "New student registered",
-            description: `${
-              studentsResponse[0]?.fullname || "A student"
-            } was added`,
-            timestamp: new Date(),
-          },
-          {
-            icon: <FaMoneyBillWave />,
-            title: "Fee payment received",
-            description:
-              feesResponse.length > 0
-                ? `$${feesResponse[0].final_amount} fee recorded`
-                : "No recent payments",
-            timestamp: new Date(),
-          },
-        ];
+        // const activities = [
+        //   {
+        //     icon: <FaUserGraduate />,
+        //     title: "New student registered",
+        //     description: `${
+        //       studentsResponse[0]?.fullname || "A student"
+        //     } was added`,
+        //     timestamp: new Date(),
+        //   },
+        //   {
+        //     icon: <FaMoneyBillWave />,
+        //     title: "Fee payment received",
+        //     description:
+        //       feesResponse.length > 0
+        //         ? `$${feesResponse[0].final_amount} fee recorded`
+        //         : "No recent payments",
+        //     timestamp: new Date(),
+        //   },
+        // ];
 
-        setRecentActivity(activities);
+        // setRecentActivity(activities);
       } catch (err) {
         setError(err.message || "Failed to load dashboard data");
         console.error("Dashboard error:", err);
@@ -129,7 +128,7 @@ export const DashboardPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentActivity activities={recentActivity} />
+        
 
         <div className="bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>

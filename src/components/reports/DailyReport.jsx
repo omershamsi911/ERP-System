@@ -30,7 +30,7 @@ const DailyReport = ({ date }) => {
             id,
             amount_paid,
             payment_method,
-            student_fees:student_fees_id (
+            student_fees:student_fee_id (
               student_id,
               students:student_id (fullname, gr_number, class)
             )
