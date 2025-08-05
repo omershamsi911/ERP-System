@@ -211,6 +211,7 @@ const FeeManagement = () => {
     { id: 'structure', label: 'Fee Structure' },
     { id: 'fines', label: 'Fee Fines' },
     { id: 'memos', label: 'Memos & Vouchers' },
+    { id: 'bulkvouchers', label: 'Voucher Generation'}
   ];
 
   return (
@@ -228,6 +229,7 @@ const FeeManagement = () => {
         {activeTab === 'structure' && <FeeStructure />}
         {activeTab === 'fines' && <FeeFines />}
         {activeTab === 'memos' && <MemoVoucherTab />}
+        {activeTab === 'bulkvouchers' && <BulkVoucherTab />}
       </div>
     </div>
   );
@@ -643,7 +645,7 @@ const FeeCollectionTab = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && searchStudents()}
+              onKeyUp={(e) => e.key === 'Enter' && searchStudents()}
               placeholder="Enter student name or GR number"
               className="w-full px-3 py-2 border border-gray-300 rounded-l-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
@@ -836,8 +838,19 @@ const FeeStructure = () => {
         setLoading(true);
         
         const { data: classFeesData } = await supabase
-          .from('class_fees')
-          .select('*');
+        .from('class_fees')
+        .select(`
+          id,
+          class,
+          fee_type_id,
+          amount,
+          number_of_installments,
+          fee_types (
+            id,
+            name,
+            fee_category_id
+          )
+        `);
         
         const { data: feeTypesData } = await supabase
           .from('fee_types')
@@ -1438,4 +1451,438 @@ const MemoVoucherTab = () => {
   );
 };
 
+
+const BulkVoucherTab = () => {
+  const [students, setStudents] = useState([]);
+  const [feeCategories, setFeeCategories] = useState([]);
+  const [classFees, setClassFees] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [voucherTemplate, setVoucherTemplate] = useState({
+    fee_category_id: '',
+    due_date: '',
+    discount: 0,
+    fine: 0,
+    remarks: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch students with filters
+        let studentsQuery = supabase
+          .from('students')
+          .select('id, fullname, class, section, gr_number');
+        
+        if (selectedClass) studentsQuery = studentsQuery.eq('class', selectedClass);
+        if (selectedSection) studentsQuery = studentsQuery.eq('section', selectedSection);
+        
+        // Fetch unique classes and sections
+        const { data: classData } = await supabase
+          .from('students')
+          .select('class')
+          .not('class', 'is', null);
+        
+        const { data: sectionData } = await supabase
+          .from('students')
+          .select('section')
+          .not('section', 'is', null);
+        
+        // Fetch fee categories
+        const { data: feeCatData } = await supabase
+          .from('fee_categories')
+          .select('*');
+        
+        // Fetch class fees
+        const { data: classFeesData } = await supabase
+          .from('class_fees')
+          .select('*');
+        
+        const [
+          { data: studentsData },
+          classDataRes,
+          sectionDataRes,
+          feeCatRes,
+          classFeesRes
+        ] = await Promise.all([
+          studentsQuery,
+          classData,
+          sectionData,
+          feeCatData,
+          classFeesData
+        ]);
+        
+        setStudents(studentsData || []);
+        setClasses([...new Set(classDataRes.map(item => item.class))]);
+        setSections([...new Set(sectionDataRes.map(item => item.section))]);
+        setFeeCategories(feeCatRes || []);
+        setClassFees(classFeesRes || []);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [selectedClass, selectedSection]);
+
+  // Handle student selection
+  const toggleStudentSelection = (studentId) => {
+    setSelectedStudents(prev => 
+      prev.includes(studentId)
+        ? prev.filter(id => id !== studentId)
+        : [...prev, studentId]
+    );
+  };
+
+  // Select all students
+  const selectAllStudents = () => {
+    setSelectedStudents(students.map(s => s.id));
+  };
+
+  // Clear all selections
+  const clearSelections = () => {
+    setSelectedStudents([]);
+  };
+
+  // Handle template changes
+  const handleTemplateChange = (e) => {
+    const { name, value } = e.target;
+    setVoucherTemplate(prev => ({
+      ...prev,
+      [name]: name.endsWith('_id') || name === 'discount' || name === 'fine' 
+        ? value
+        : value
+    }));
+  };
+
+  // Get class fee amount for a specific student
+  const getClassFeeAmount = (studentClass) => {
+    if (!voucherTemplate.fee_category_id) return 0;
+    
+    const classFee = classFees.find(fee => 
+      fee.fee_category_id === voucherTemplate.fee_category_id && 
+      fee.class === studentClass
+    );
+    
+    return classFee ? classFee.amount : 0;
+  };
+
+  // Calculate final amount for a specific student
+  const calculateFinalAmount = (studentClass) => {
+    const baseAmount = getClassFeeAmount(studentClass);
+    return baseAmount - voucherTemplate.discount + voucherTemplate.fine;
+  };
+
+  // Calculate average final amount for summary
+  const calculateAverageAmount = () => {
+    if (selectedStudents.length === 0) return 0;
+    
+    const total = selectedStudents.reduce((sum, studentId) => {
+      const student = students.find(s => s.id === studentId);
+      return sum + calculateFinalAmount(student.class);
+    }, 0);
+    
+    return total / selectedStudents.length;
+  };
+
+  // Generate vouchers
+  const generateVouchers = async () => {
+    if (selectedStudents.length === 0) {
+      setStatusMessage('Please select at least one student');
+      return;
+    }
+
+    if (!voucherTemplate.fee_category_id || !voucherTemplate.due_date) {
+      setStatusMessage('Please complete all required fields');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const feeCategory = feeCategories.find(fc => fc.id === voucherTemplate.fee_category_id);
+      
+      if (!feeCategory) {
+        setStatusMessage('Invalid fee category');
+        return;
+      }
+      
+      const vouchers = [];
+      const errors = [];
+
+      for (const studentId of selectedStudents) {
+        const student = students.find(s => s.id === studentId);
+        if (!student) {
+          errors.push(`Student not found: ${studentId}`);
+          continue;
+        }
+        
+        const classFee = classFees.find(fee => 
+          fee.fee_category_id === voucherTemplate.fee_category_id && 
+          fee.class === student.class
+        );
+        
+        if (!classFee) {
+          errors.push(`No fee structure found for ${student.fullname} (Class ${student.class})`);
+          continue;
+        }
+        
+        const finalAmount = classFee.amount - voucherTemplate.discount + voucherTemplate.fine;
+        
+        vouchers.push({
+          student_id: studentId,
+          fee_type: feeCategory.name,
+          fee_category_id: voucherTemplate.fee_category_id,
+          class_fee_id: classFee.id,
+          total_amount: classFee.amount,
+          discount_amount: voucherTemplate.discount,
+          fine_amount: voucherTemplate.fine,
+          final_amount: finalAmount,
+          due_date: voucherTemplate.due_date,
+          status: 'unpaid',
+          remarks: voucherTemplate.remarks
+        });
+      }
+
+      if (vouchers.length === 0) {
+        setStatusMessage('No valid vouchers to generate. ' + errors.join('; '));
+        return;
+      }
+
+      // Insert into database
+      const { error } = await supabase
+        .from('student_fees')
+        .insert(vouchers);
+      
+      if (error) throw error;
+      
+      setStatusMessage(`Successfully generated ${vouchers.length} vouchers. ${errors.length ? `Errors: ${errors.join('; ')}` : ''}`);
+      setSelectedStudents([]);
+    } catch (error) {
+      console.error('Error generating vouchers:', error);
+      setStatusMessage(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">Bulk Voucher Generation</h2>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Student Selection */}
+        <div className="student-selection">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Select Students</h3>
+            <div className="flex space-x-2">
+              <Button onClick={selectAllStudents} variant="secondary">
+                Select All
+              </Button>
+              <Button onClick={clearSelections} variant="secondary">
+                Clear
+              </Button>
+            </div>
+          </div>
+          
+          {/* Filter Controls */}
+          <div className="flex flex-wrap gap-4 mb-4">
+            <div className="w-full md:w-auto">
+              <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select
+                id="class-filter"
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Classes</option>
+                {classes.map((classItem) => (
+                  <option key={classItem} value={classItem}>
+                    {classItem}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+              <select
+                id="section-filter"
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Sections</option>
+                {sections.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 max-h-96 overflow-y-auto">
+            {loading ? (
+              <p className="text-center py-8">Loading students...</p>
+            ) : students.length === 0 ? (
+              <p className="text-center py-8 text-gray-500">No students found</p>
+            ) : (
+              <div className="space-y-2">
+                {students.map(student => (
+                  <div key={student.id} className="flex items-center p-2 hover:bg-gray-100 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudents.includes(student.id)}
+                      onChange={() => toggleStudentSelection(student.id)}
+                      className="mr-3 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <div className="font-medium">{student.fullname}</div>
+                      <div className="text-sm text-gray-500">
+                        {student.class} - {student.section} | GR: {student.gr_number}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-2 text-sm text-gray-600">
+            {selectedStudents.length} {selectedStudents.length === 1 ? 'student' : 'students'} selected
+          </div>
+        </div>
+        
+        {/* Voucher Template */}
+        <div className="voucher-template">
+          <h3 className="text-lg font-semibold mb-4">Voucher Template</h3>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Fee Category</label>
+              <select
+                name="fee_category_id"
+                value={voucherTemplate.fee_category_id}
+                onChange={handleTemplateChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                required
+              >
+                <option value="">Select Category</option>
+                {feeCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name} - {cat.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+              <input
+                type="date"
+                name="due_date"
+                value={voucherTemplate.due_date}
+                onChange={handleTemplateChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount (Rs.)</label>
+                <input
+                  type="number"
+                  name="discount"
+                  value={voucherTemplate.discount}
+                  onChange={handleTemplateChange}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fine (Rs.)</label>
+                <input
+                  type="number"
+                  name="fine"
+                  value={voucherTemplate.fine}
+                  onChange={handleTemplateChange}
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <textarea
+                name="remarks"
+                value={voucherTemplate.remarks}
+                onChange={handleTemplateChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                rows={2}
+              />
+            </div>
+            
+            {/* Fee Summary */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <h4 className="font-medium text-gray-700 mb-3">Fee Summary</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Base Amount:</span>
+                  <span>Varies by class</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Discount:</span>
+                  <span className="text-green-600">- Rs. {voucherTemplate.discount || '0.00'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Fine:</span>
+                  <span className="text-red-600">+ Rs. {voucherTemplate.fine || '0.00'}</span>
+                </div>
+                <div className="flex justify-between border-t border-gray-200 pt-2 font-medium">
+                  <span>Average Final Amount:</span>
+                  <span>Rs. {calculateAverageAmount().toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="pt-4">
+              <Button 
+                onClick={generateVouchers}
+                className="w-full flex justify-center"
+                disabled={loading || selectedStudents.length === 0}
+              >
+                {loading ? (
+                  <span>Generating Vouchers...</span>
+                ) : (
+                  <span>Generate {selectedStudents.length} Vouchers</span>
+                )}
+              </Button>
+              
+              {statusMessage && (
+                <div className={`mt-3 text-center text-sm p-2 rounded ${
+                  statusMessage.startsWith('Success') 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  {statusMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
 export default FeeManagement;
