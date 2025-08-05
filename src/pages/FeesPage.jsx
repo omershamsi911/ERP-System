@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Search, ChevronDown, X } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
-// Reusable Components (same as before)
+// Reusable Components
 const Card = ({ children, className = '' }) => (
     <div className={`bg-white rounded-xl shadow-md p-6 ${className}`}>
         {children}
@@ -55,6 +55,10 @@ const FeesPage = () => {
     const [studentFees, setStudentFees] = useState([]);
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [classes, setClasses] = useState([]);
+    const [sections, setSections] = useState([]);
+    const [selectedClass, setSelectedClass] = useState('');
+    const [selectedSection, setSelectedSection] = useState('');
     const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
     useEffect(() => {
@@ -62,24 +66,29 @@ const FeesPage = () => {
             try {
                 setLoading(true);
                 
-                // Fetch student fees with related data
-                const { data: feesData, error: feesError } = await supabase
+                // Fetch unique classes and sections
+                const { data: classData } = await supabase
+                    .from('students')
+                    .select('class')
+                    .not('class', 'is', null);
+                
+                const { data: sectionData } = await supabase
+                    .from('students')
+                    .select('section')
+                    .not('section', 'is', null);
+                
+                setClasses([...new Set(classData.map(item => item.class))]);
+                setSections([...new Set(sectionData.map(item => item.section))]);
+                
+                // Fetch all student fees
+                const { data: feesData } = await supabase
                     .from('student_fees')
                     .select('*');
                 
-                if (feesError) throw feesError;
-                
-                // Fetch students
-                const { data: studentsData, error: studentsError } = await supabase
-                    .from('students')
-                    .select('id, fullname, class, gr_number');
-                
-                if (studentsError) throw studentsError;
-
-                
-                
                 setStudentFees(feesData || []);
-                setStudents(studentsData || []);
+                
+                // Fetch students with filters
+                await fetchStudents();
             } catch (error) {
                 console.error('Error fetching data:', error);
             } finally {
@@ -90,32 +99,57 @@ const FeesPage = () => {
         fetchData();
     }, []);
 
-    const getStudentDetails = (studentId) => students.find(s => s.id === studentId) || {};
+    // Fetch students based on current filters
+    const fetchStudents = async () => {
+        let query = supabase
+            .from('students')
+            .select('id, fullname, class, gr_number, section');
+        
+        if (selectedClass) {
+            query = query.eq('class', selectedClass);
+        }
+        
+        if (selectedSection) {
+            query = query.eq('section', selectedSection);
+        }
+        
+        const { data: studentsData } = await query;
+        setStudents(studentsData || []);
+    };
 
-    const paidStudents = studentFees.filter(sf => sf.status === 'paid').map(sf => ({ 
-        ...sf, 
-        student: getStudentDetails(sf.student_id),
-        rollNumber: getStudentDetails(sf.student_id)?.roll_number || 'N/A'
-    }));
-    
-    const unpaidStudents = studentFees.filter(sf => sf.status === 'pending').map(sf => ({ 
-        ...sf, 
-        student: getStudentDetails(sf.student_id),
-        rollNumber: getStudentDetails(sf.student_id)?.gr_number || 'N/A'
-    }));
-    
-    const defaulters = studentFees.filter(sf => sf.status === 'overdue').map(sf => ({ 
-        ...sf, 
-        student: getStudentDetails(sf.student_id),
-        rollNumber: getStudentDetails(sf.student_id)?.roll_number || 'N/A'
-    }));
+    // Refetch students when filters change
+    useEffect(() => {
+        fetchStudents();
+    }, [selectedClass, selectedSection]);
+
+    // Get filtered and mapped student fees
+    const getFilteredStudentFees = (status) => {
+        // First filter by status
+        const feesByStatus = studentFees.filter(sf => sf.status === status);
+        
+        // Then filter by currently selected students (class/section filters)
+        return feesByStatus
+            .filter(sf => students.some(s => s.id === sf.student_id))
+            .map(sf => {
+                const student = students.find(s => s.id === sf.student_id) || {};
+                return {
+                    ...sf,
+                    student,
+                    rollNumber: student.gr_number || 'N/A'
+                };
+            });
+    };
+
+    const paidStudents = getFilteredStudentFees('paid');
+    const unpaidStudents = getFilteredStudentFees('pending');
+    const defaulters = getFilteredStudentFees('overdue');
 
     const tabs = [
         { id: 'paid', label: `Paid (${paidStudents.length})` },
         { id: 'unpaid', label: `Unpaid (${unpaidStudents.length})` },
         { id: 'defaulters', label: `Defaulters (${defaulters.length})` },
     ];
-
+    
     const renderStudentList = (students) => {
         if (loading) {
             return <p className="text-center text-gray-500 py-8">Loading...</p>;
@@ -132,6 +166,7 @@ const FeesPage = () => {
                         <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Due</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
@@ -145,6 +180,7 @@ const FeesPage = () => {
                                     <div className="text-sm text-gray-500">Roll #: {rollNumber}</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student?.class || 'Unknown'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student?.section || 'N/A'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">Rs. {final_amount?.toLocaleString() || '0'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{due_date ? new Date(due_date).toLocaleDateString() : 'N/A'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{remarks || 'N/A'}</td>
@@ -160,6 +196,44 @@ const FeesPage = () => {
         <Card>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Fee Status for {currentMonth}</h2>
             <p className="text-gray-600 mb-6">Overview of student fee payments.</p>
+            
+            {/* Filter Controls */}
+            <div className="flex flex-wrap gap-4 mb-6">
+                <div className="w-full md:w-auto">
+                    <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+                    <select
+                        id="class-filter"
+                        value={selectedClass}
+                        onChange={(e) => setSelectedClass(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option value="">All Classes</option>
+                        {classes.map((classItem) => (
+                            <option key={classItem} value={classItem}>
+                                {classItem}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                
+                <div className="w-full md:w-auto">
+                    <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                    <select
+                        id="section-filter"
+                        value={selectedSection}
+                        onChange={(e) => setSelectedSection(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        <option value="">All Sections</option>
+                        {sections.map((section) => (
+                            <option key={section} value={section}>
+                                {section}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+            
             <div className="border-b border-gray-200">
                 <nav className="-mb-px flex space-x-6" aria-label="Tabs">
                     {tabs.map(tab => (
@@ -177,6 +251,7 @@ const FeesPage = () => {
                     ))}
                 </nav>
             </div>
+            
             <div className="mt-6">
                 {activeTab === 'paid' && renderStudentList(paidStudents)}
                 {activeTab === 'unpaid' && renderStudentList(unpaidStudents)}

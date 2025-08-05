@@ -11,6 +11,10 @@ const AttendancePage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingRecord, setEditingRecord] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -20,16 +24,60 @@ const AttendancePage = () => {
     remarks: 'ontime'
   });
 
+  // Fetch classes and sections
+  useEffect(() => {
+    const fetchClassesAndSections = async () => {
+      try {
+        // Fetch unique classes
+        const { data: classData, error: classError } = await supabase
+          .from('students')
+          .select('class')
+          .not('class', 'is', null);
+        
+        if (classError) throw classError;
+        
+        const uniqueClasses = [...new Set(classData.map(item => item.class))];
+        setClasses(uniqueClasses);
+        
+        // Fetch unique sections
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('students')
+          .select('section')
+          .not('section', 'is', null);
+        
+        if (sectionError) throw sectionError;
+        
+        const uniqueSections = [...new Set(sectionData.map(item => item.section))];
+        setSections(uniqueSections);
+      } catch (err) {
+        console.error('Error fetching classes/sections:', err.message);
+      }
+    };
+    
+    fetchClassesAndSections();
+  }, []);
+
   // Fetch students and attendance data
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         
-        // Fetch students
-        const { data: studentsData, error: studentsError } = await supabase
+        // Build student query with filters
+        let studentQuery = supabase
           .from('students')
-          .select('id, fullname, gr_number, class');
+          .select('id, fullname, gr_number, class, section');
+        
+        if (selectedClass) {
+          studentQuery = studentQuery.eq('class', selectedClass);
+        }
+        
+        if (selectedSection) {
+          studentQuery = studentQuery.eq('section', selectedSection);
+        }
+        
+        // Fetch students
+        const { data: studentsData, error: studentsError } = await studentQuery;
         
         if (studentsError) throw studentsError;
         
@@ -51,7 +99,7 @@ const AttendancePage = () => {
     };
     
     fetchData();
-  }, [selectedDate]);
+  }, [selectedDate, selectedClass, selectedSection]);
 
   // Handle date change
   const handleDateChange = (e) => {
@@ -63,12 +111,23 @@ const AttendancePage = () => {
     setSearchTerm(e.target.value);
   };
 
-  // Filter students based on search term
+  // Handle class filter change
+  const handleClassChange = (e) => {
+    setSelectedClass(e.target.value);
+  };
+
+  // Handle section filter change
+  const handleSectionChange = (e) => {
+    setSelectedSection(e.target.value);
+  };
+
+  // Filter students based on search term and filters
   const filteredStudents = students.filter(student => 
     student.fullname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.gr_number.toString().includes(searchTerm) ||
     student.class.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
 
   // Handle status change
   const handleStatusChange = async (studentId, newStatus) => {
@@ -269,7 +328,7 @@ const AttendancePage = () => {
         <h1 className="text-2xl font-bold text-gray-800 mb-4">Student Attendance</h1>
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap gap-4">
             <div className="w-full md:w-auto">
               <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
               <input
@@ -279,6 +338,40 @@ const AttendancePage = () => {
                 onChange={handleDateChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
               />
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+              <select
+                id="class-filter"
+                value={selectedClass}
+                onChange={handleClassChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Classes</option>
+                {classes.map((classItem) => (
+                  <option key={classItem} value={classItem}>
+                    {classItem}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="w-full md:w-auto">
+              <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+              <select
+                id="section-filter"
+                value={selectedSection}
+                onChange={handleSectionChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">All Sections</option>
+                {sections.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           
