@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Plus, Edit, Trash2, Search, Printer, Download, ChevronDown, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Printer, Download, ChevronDown, X, Filter } from 'lucide-react';
 
 // Reusable Components
 const Card = ({ children, className = '' }) => (
@@ -11,7 +11,8 @@ const Button = ({ children, onClick, className = '', variant = 'primary' }) => {
   const variantClasses = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
     secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-    danger: 'bg-red-600 text-white hover:bg-red-700'
+    danger: 'bg-red-600 text-white hover:bg-red-700',
+    success: 'bg-green-600 text-white hover:bg-green-700'
   };
   return (
     <button
@@ -44,7 +45,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 
 // Main Certification Component
 const CertificationResultsPage = () => {
-  const [activeTab, setActiveTab] = useState('certificates');
+  const [activeTab, setActiveTab] = useState('results');
   const [certificates, setCertificates] = useState([]);
   const [students, setStudents] = useState([]);
   const [exams, setExams] = useState([]);
@@ -62,7 +63,7 @@ const CertificationResultsPage = () => {
     fields: []
   });
   
-  // New state for class/section grouping and exam results
+  // State for results
   const [classes, setClasses] = useState([]);
   const [sections, setSections] = useState([]);
   const [examTypes, setExamTypes] = useState([]);
@@ -70,8 +71,11 @@ const CertificationResultsPage = () => {
   const [selectedSection, setSelectedSection] = useState('');
   const [selectedExamType, setSelectedExamType] = useState('');
   const [examResults, setExamResults] = useState([]);
+  const [quizResults, setQuizResults] = useState([]);
   const [classStudents, setClassStudents] = useState([]);
   const [classSubjects, setClassSubjects] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudentResults, setSelectedStudentResults] = useState(null);
 
   // Certificate types
   const certificateTypes = [
@@ -100,17 +104,17 @@ const CertificationResultsPage = () => {
         // Fetch students
         const { data: studentData } = await supabase
           .from('students')
-          .select('id, fullname, class, section, gr_number, dob, admission_date');
+          .select('id, fullname, class, section, gr_number, dob, admission_date, class_id, section_id');
         
         // Fetch exams
         const { data: examData } = await supabase
           .from('exams')
-          .select('id, date, exam_type, subject');
+          .select('id, date, exam_type, subject, student_id, marks_obtained, total_marks, grade, remarks, term_details_id');
         
         // Fetch quizzes
         const { data: quizData } = await supabase
           .from('quiz')
-          .select('id, date, subject, rubric');
+          .select('id, date, subject, rubric, student_id, cp');
         
         // Fetch classes and sections
         const { data: classData } = await supabase
@@ -129,9 +133,6 @@ const CertificationResultsPage = () => {
         }));
 
         setExamTypes(examTypes);
-
-        console.log(examTypes);
-        
         setCertificates(certData || []);
         setStudents(studentData || []);
         setExams(examData || []);
@@ -157,74 +158,70 @@ const CertificationResultsPage = () => {
 
   // Fetch exam results when class, section or exam type changes
   useEffect(() => {
-  const fetchExamResults = async () => {
-    if (!selectedClass || !selectedSection || !selectedExamType) return;
+    const fetchExamResults = async () => {
+      if (!selectedClass || !selectedSection) return;
 
-    try {
-      setLoading(true);
+      try {
+        setLoading(true);
 
-      // Fetch exams with student data joined
-      const { data: resultsData, error } = await supabase
-        .from('exams')
-        .select(`
-          id,
-          student_id,
-          subject,
-          marks_obtained,
-          total_marks,
-          grade,
-          exam_type,
-          students (
-            id,
-            fullname,
-            gr_number,
-            class,
-            section
-          )
-        `)
-        .eq('exam_type', selectedExamType);
-
-      if (error) {
-        console.error('Error fetching joined exam results:', error);
-        return;
-      }
-
-      // Filter results by selected class and section
-      const filteredResults = (resultsData || []).filter(result => {
-        return (
-          result.students?.class === selectedClass &&
-          result.students?.section === selectedSection
-        );
-      });
-
-      // Extract unique students and subjects
-      const studentsMap = new Map();
-      const subjectsSet = new Set();
-
-      filteredResults.forEach(result => {
-        const student = result.students;
-        if (student && !studentsMap.has(student.id)) {
-          studentsMap.set(student.id, {
-            id: student.id,
-            fullname: student.fullname,
-            gr_number: student.gr_number
-          });
+        // Fetch students in the selected class and section
+        const { data: studentsData, error: studentsError } = await supabase
+          .from('students')
+          .select('id, fullname, gr_number, class_id, section_id')
+          .eq('class_id', selectedClass)
+          .eq('section_id', selectedSection);
+        
+        if (studentsError) {
+          console.error('Error fetching students:', studentsError);
+          return;
         }
-        subjectsSet.add(result.subject);
-      });
+        
+        setClassStudents(studentsData || []);
+        
+        // Fetch exam results for these students
+        const studentIds = studentsData.map(s => s.id);
+        const { data: resultsData, error: resultsError } = await supabase
+          .from('exams')
+          .select('*')
+          .in('student_id', studentIds);
+          console.log(resultsData)
+          
+        if (resultsError) {
+          console.error('Error fetching exam results:', resultsError);
+          return;
+        }
+        
+        setExamResults(resultsData);
+        
+        // Fetch quiz results for these students
+        const { data: quizResultsData, error: quizError } = await supabase
+          .from('quiz')
+          .select('*')
+          .in('student_id', studentIds);
+          
+        if (quizError) {
+          console.error('Error fetching quiz results:', quizError);
+          return;
+        }
+        
+        setQuizResults(quizResultsData || []);
+        
+        // Extract unique subjects from exams and quizzes
+        const examSubjects = [...new Set(resultsData.map(r => r.subject))];
+        console.log(examSubjects)
+        const quizSubjects = [...new Set(quizResultsData.map(q => q.subject))];
+        const allSubjects = [...new Set([...examSubjects, ...quizSubjects])];
+        
+        setClassSubjects(allSubjects);
+      } catch (error) {
+        console.error('Error processing results:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setClassStudents(Array.from(studentsMap.values()));
-      setExamResults(filteredResults);
-      setClassSubjects(Array.from(subjectsSet));
-    } catch (error) {
-      console.error('Error processing exam results:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchExamResults();
-}, [selectedClass, selectedSection, selectedExamType]);
+    fetchExamResults();
+  }, [selectedClass, selectedSection, selectedExamType]);
 
   // Handle certificate creation/update
   const handleSaveCertificate = async () => {
@@ -298,91 +295,171 @@ const CertificationResultsPage = () => {
     );
   };
 
-  // Generate results for entire class
-  const generateClassResults = () => {
-  if (!selectedClass || !selectedSection || !selectedExamType) {
+  // Filter students based on search query
+  const filteredStudents = classStudents.filter(student => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
     return (
-      <div className="text-center py-8 text-gray-500">
-        Please select class, section, and exam type
-      </div>
+      student.fullname.toLowerCase().includes(query) ||
+      student.gr_number.toLowerCase().includes(query)
     );
-  }
+  });
 
-  if (loading) {
-    return <div className="text-center py-8">Loading results...</div>;
-  }
+  // Get results for a specific student
+  const getStudentResults = (studentId) => {
+    const student = classStudents.find(s => s.id === studentId);
+    if (!student) return null;
+    
+    // Get exam results for this student
+    const studentExams = examResults.filter(e => e.student_id === studentId);
+    console.log("mei hon",examResults)
+    
+    // Get quiz results for this student
+    const studentQuizzes = quizResults.filter(q => q.student_id === studentId);
+    
+    // Group by subject
+    const resultsBySubject = {};
+    
+    // Process exam results
+    studentExams.forEach(exam => {
+      if (!resultsBySubject[exam.subject]) {
+        resultsBySubject[exam.subject] = {
+          exams: {},
+          quizzes: []
+        };
+      }
+      resultsBySubject[exam.subject].exams[exam.exam_type] = {
+        marks_obtained: exam.marks_obtained,
+        total_marks: exam.total_marks,
+        grade: exam.grade,
+        remarks: exam.remarks
+      };
+    });
+    console.log("bysubject",resultsBySubject)
+    
+    // Process quiz results
+    studentQuizzes.forEach(quiz => {
+      if (!resultsBySubject[quiz.subject]) {
+        resultsBySubject[quiz.subject] = {
+          exams: {},
+          quizzes: []
+        };
+      }
+      resultsBySubject[quiz.subject].quizzes.push({
+        date: quiz.date,
+        rubric: quiz.rubric,
+        cp: quiz.cp
+      });
+    });
+    
+    // Calculate cumulative scores per subject
+    Object.keys(resultsBySubject).forEach(subject => {
+      const subjectData = resultsBySubject[subject];
+      const quizCount = subjectData.quizzes.length;
+      const quizTotal = subjectData.quizzes.reduce((sum, quiz) => {
+        // Assuming cp is a numeric score
+        const score = parseFloat(quiz.cp) || 0;
+        return sum + score;
+      }, 0);
+      
+      const quizAvg = quizCount > 0 ? (quizTotal / quizCount) : 0;
+      
+      const midTerm = subjectData.exams.mid || {};
+      const finalTerm = subjectData.exams.final || {};
+      
+      // Simple cumulative calculation (adjust weights as needed)
+      const cumulative = 
+        (quizAvg * 0.2) + 
+        ((midTerm.marks_obtained || 0) * 0.3) + 
+        ((finalTerm.marks_obtained || 0) * 0.5);
+      
+      resultsBySubject[subject].cumulative = Math.round(cumulative);
+    });
+    
+    return {
+      student,
+      results: resultsBySubject
+    };
+  };
 
-  if (classStudents.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No students found in the selected class/section
-      </div>
-    );
-  }
-
-  if (examResults.length === 0) {
-    return (
-      <div className="text-center py-8 text-gray-500">
-        No results found for the selected exam type
-      </div>
-    );
-  }
-
-  const selectedClassObj = classes.find(c => c.id === selectedClass);
-  const selectedSectionObj = sections.find(s => s.id === selectedSection);
-  const selectedExamTypeObj = examTypes.find(e => e.id === selectedExamType);
+  // Display student results
+  const displayStudentResults = () => {
+    if (!selectedStudentResults) return null;
+    
+    const { student, results } = selectedStudentResults;
+    const subjects = Object.keys(results);
+    
+    const selectedClassObj = classes.find(c => c.id === selectedClass);
+    const selectedSectionObj = sections.find(s => s.id === selectedSection);
     
     return (
       <div className="border border-gray-200 p-6 bg-white printable">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold">Class Results</h2>
-          <p className="text-gray-600">
-            {selectedClassObj?.name || 'Class'} - {selectedSectionObj?.name || 'Section'} | 
-            {selectedExamTypeObj?.name || 'Exam Type'}
-          </p>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">Student Result</h2>
+            <p className="text-gray-600">
+              {selectedClassObj?.name || 'Class'} - {selectedSectionObj?.name || 'Section'} | 
+              Term: {selectedExamType || 'All Terms'}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold">{student.fullname}</p>
+            <p>GR Number: {student.gr_number}</p>
+          </div>
         </div>
         
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="p-2 border text-left">Student</th>
-                <th className="p-2 border text-left">GR Number</th>
-                {classSubjects.map((subject, index) => (
-                  <React.Fragment key={index}>
-                    <th className="p-2 border text-center">{subject}</th>
-                    <th className="p-2 border text-center">Grade</th>
-                    <th className="p-2 border text-center">Remarks</th>
-                  </React.Fragment>
-                ))}
+              <tr className="bg-blue-50">
+                <th className="p-3 border text-left">Subject</th>
+                <th className="p-3 border text-center">Quizzes</th>
+                <th className="p-3 border text-center">Mid Term</th>
+                <th className="p-3 border text-center">Final Exam</th>
               </tr>
             </thead>
             <tbody>
-              {classStudents.map(student => {
-                const studentResults = examResults.filter(r => r.student_id === student.id);
+              {subjects.map((subject, index) => {
+                const subjectData = results[subject];
+                console.log("Subject", subject)
+                console.log("main result hoon", results[subject])
+                const quizCount = subjectData.quizzes.length;
+                const quizAvg = quizCount > 0 ? 
+                  (subjectData.quizzes.reduce((sum, quiz) => sum + (parseFloat(quiz.rubric) || 0), 0) / quizCount) : 
+                  0;
+                
+                const midTerm = subjectData.exams.Midterm || {};
+                // console.log("midterm", midTerm, "midterm 2", subjectData.exams.mid);
+                const finalTerm = subjectData.exams.Final || {};
                 
                 return (
-                  <tr key={student.id}>
-                    <td className="p-2 border">{student.fullname}</td>
-                    <td className="p-2 border">{student.gr_number}</td>
-                    
-                    {classSubjects.map((subject, index) => {
-                      const result = studentResults.find(r => r.subject === subject);
-                      
-                      return (
-                        <React.Fragment key={index}>
-                          <td className="p-2 border text-center">
-                            {result ? `${result.marks_obtained}/${result.total_marks}` : '-'}
-                          </td>
-                          <td className="p-2 border text-center">
-                            {result?.grade || '-'}
-                          </td>
-                          <td className="p-2 border text-center">
-                            {result?.remarks || '-'}
-                          </td>
-                        </React.Fragment>
-                      );
-                    })}
+                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="p-3 border font-medium">{subject}</td>
+                    <td className="p-3 border text-center">
+                      {quizCount > 0 ? (
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium">{quizAvg.toFixed(1)}</span>
+                          <span className="text-xs text-gray-500">({quizCount} quizzes)</span>
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="p-3 border text-center">
+                      {midTerm.marks_obtained ? (
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium">{midTerm.marks_obtained}/{midTerm.total_marks}</span>
+                          <span className="text-xs text-gray-500">{midTerm.grade}</span>
+                        </div>
+                      ) : '-'}
+                    </td>
+                    <td className="p-3 border text-center">
+                      {finalTerm.marks_obtained ? (
+                        <div className="flex flex-col items-center">
+                          <span className="font-medium">{finalTerm.marks_obtained}/{finalTerm.total_marks}</span>
+                          <span className="text-xs text-gray-500">{finalTerm.grade}</span>
+                        </div>
+                      ) : '-'}
+                    </td>
+
                   </tr>
                 );
               })}
@@ -390,14 +467,82 @@ const CertificationResultsPage = () => {
           </table>
         </div>
         
-        <div className="mt-6 flex justify-between">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-bold text-lg mb-3">Quiz Details</h3>
+            {subjects.map((subject, index) => {
+              const subjectData = results[subject];
+              if (subjectData.quizzes.length === 0) return null;
+              
+              return (
+                <div key={index} className="mb-4">
+                  <h4 className="font-medium text-gray-700 mb-2">{subject}</h4>
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="p-2 text-left">Date</th>
+                          <th className="p-2 text-left">Rubric</th>
+                          <th className="p-2 text-left">Score</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {subjectData.quizzes.map((quiz, qIndex) => (
+                          <tr key={qIndex} className={qIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="p-2">{new Date(quiz.date).toLocaleDateString()}</td>
+                            <td className="p-2">{quiz.rubric}</td>
+                            <td className="p-2 font-medium">{quiz.cp}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div>
+            <h3 className="font-bold text-lg mb-3">Remarks</h3>
+            {subjects.map((subject, index) => {
+              const subjectData = results[subject];
+              const remarks = [];
+              
+              if (subjectData.exams.mid && subjectData.exams.mid.remarks) {
+                remarks.push({ type: 'Mid Term', remark: subjectData.exams.mid.remarks });
+              }
+              
+              if (subjectData.exams.final && subjectData.exams.final.remarks) {
+                remarks.push({ type: 'Final Exam', remark: subjectData.exams.final.remarks });
+              }
+              
+              if (remarks.length === 0) return null;
+              
+              return (
+                <div key={index} className="mb-4">
+                  <h4 className="font-medium text-gray-700 mb-2">{subject}</h4>
+                  <div className="space-y-2">
+                    {remarks.map((remark, rIndex) => (
+                      <div key={rIndex} className="bg-gray-50 p-3 rounded-lg">
+                        <p className="font-medium text-sm">{remark.type}:</p>
+                        <p>{remark.remark}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        <div className="mt-8 flex justify-between border-t pt-4">
           <div>
             <p className="font-medium">Class Teacher Remarks:</p>
-            <p className="border-b-2 border-gray-300 min-w-[200px] h-8"></p>
+            <p className="mt-2 italic">Excellent performance overall. Shows great potential.</p>
           </div>
-          <div>
+          <div className="text-right">
             <p className="font-medium">Principal Signature:</p>
-            <p className="border-b-2 border-gray-300 min-w-[200px] h-8"></p>
+            <div className="mt-6 h-12 w-32 border-b border-gray-400"></div>
           </div>
         </div>
       </div>
@@ -422,6 +567,7 @@ const CertificationResultsPage = () => {
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
           th { background-color: #f2f2f2; }
+          .printable { width: 100%; }
         </style>
       </head>
       <body>
@@ -440,26 +586,149 @@ const CertificationResultsPage = () => {
     printWindow.document.close();
   };
 
+  // Download results as PDF
+  const handleDownload = () => {
+    alert('PDF download functionality would be implemented here');
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-800 mb-6">Certificates & Results</h1>
+      <h1 className="text-3xl font-bold text-gray-800 mb-6">Student Results & Certificates</h1>
       
       <div className="flex border-b border-gray-200 mb-6">
-        <button
-          onClick={() => setActiveTab('certificates')}
-          className={`py-4 px-6 font-medium ${activeTab === 'certificates' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
-        >
-          Certificates
-        </button>
         <button
           onClick={() => setActiveTab('results')}
           className={`py-4 px-6 font-medium ${activeTab === 'results' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
         >
           Results
         </button>
+        <button
+          onClick={() => setActiveTab('certificates')}
+          className={`py-4 px-6 font-medium ${activeTab === 'certificates' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500'}`}
+        >
+          Certificates
+        </button>
       </div>
       
-      {activeTab === 'certificates' ? (
+      {activeTab === 'results' ? (
+        <div className="space-y-6">
+          <Card>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
+                <select
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select a class</option>
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Section</label>
+                <select
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select a section</option>
+                  {sections.map(sec => (
+                    <option key={sec.id} value={sec.id}>{sec.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Term</label>
+                <select
+                  value={selectedExamType}
+                  onChange={(e) => setSelectedExamType(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">All Terms</option>
+                  {examTypes.map(exam => (
+                    <option key={exam.id} value={exam.id}>{exam.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Student</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Name or GR number..."
+                    className="w-full p-2 pl-10 border border-gray-300 rounded-lg"
+                  />
+                  <Search size={18} className="absolute left-3 top-2.5 text-gray-400" />
+                </div>
+              </div>
+            </div>
+            
+            {loading ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                <p className="mt-2 text-gray-600">Loading results...</p>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {searchQuery ? 'No students match your search' : 'No students found in this class/section'}
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="p-3 text-left">Student</th>
+                      <th className="p-3 text-left">GR Number</th>
+                      <th className="p-3 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((student, index) => (
+                      <tr key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="p-3 font-medium">{student.fullname}</td>
+                        <td className="p-3">{student.gr_number}</td>
+                        <td className="p-3 text-center">
+                          <Button 
+                            onClick={() => setSelectedStudentResults(getStudentResults(student.id))}
+                            variant="primary"
+                            className="py-1 px-3 text-sm"
+                          >
+                            View Results
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+          
+          {selectedStudentResults && (
+            <Card>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800">
+                  {selectedStudentResults.student.fullname}'s Results
+                </h2>
+                <div className="flex space-x-2">
+                  <Button variant="success" onClick={handleDownload}>
+                    <Download size={18} className="mr-2" /> Download PDF
+                  </Button>
+                  <Button onClick={handlePrint}>
+                    <Printer size={18} className="mr-2" /> Print Results
+                  </Button>
+                </div>
+              </div>
+              {displayStudentResults()}
+            </Card>
+          )}
+        </div>
+      ) : (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold text-gray-800">Certificate Templates</h2>
@@ -560,64 +829,6 @@ const CertificationResultsPage = () => {
               </Button>
               <Button onClick={handlePrint}>
                 <Printer size={18} className="mr-2" /> Print Certificate
-              </Button>
-            </div>
-          </Card>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <Card>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Generate Class Results</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select a class</option>
-                  {classes.map(cls => (
-                    <option key={cls.id} value={cls.id}>{cls.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Section</label>
-                <select
-                  value={selectedSection}
-                  onChange={(e) => setSelectedSection(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select a section</option>
-                  {sections.map(sec => (
-                    <option key={sec.id} value={sec.id}>{sec.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam Type</label>
-                <select
-                  value={selectedExamType}
-                  onChange={(e) => setSelectedExamType(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select an exam type</option>
-                  {examTypes.map(exam => (
-                    <option key={exam.id} value={exam.id}>{exam.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            {generateClassResults()}
-            
-            <div className="mt-4 flex justify-end space-x-3">
-              <Button variant="secondary">
-                <Download size={18} className="mr-2" /> Download
-              </Button>
-              <Button onClick={handlePrint}>
-                <Printer size={18} className="mr-2" /> Print Results
               </Button>
             </div>
           </Card>

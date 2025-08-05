@@ -1210,10 +1210,10 @@ const StudentPerformanceDashboard = ({ studentId }: { studentId?: string }) => {
                               <div className="w-16 bg-gray-200 rounded-full h-2">
                                 <div
                                   className={`h-2 rounded-full bg-gradient-to-r ${getGradeColor(metric.value)} transition-all duration-500`}
-                                  style={{ width: `${metric.value}%` }}
+                                  style={{ width: `${metric.value* 10}%` }}
                                 ></div>
                               </div>
-                              <span className="text-sm font-bold text-gray-900 w-10">{metric.value}%</span>
+                              <span className="text-sm font-bold text-gray-900 w-10">{metric.value * 10}%</span>
                             </div>
                           </div>
                         ))}

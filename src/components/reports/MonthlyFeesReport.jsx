@@ -40,7 +40,7 @@ const MonthlyFeesReport = ({ month, year }) => {
           .lte('payment_date', endDate)
           .order('payment_date', { ascending: false });
 
-          console.log(payments);
+          (payments);
 
         if (paymentsError) throw paymentsError;
 

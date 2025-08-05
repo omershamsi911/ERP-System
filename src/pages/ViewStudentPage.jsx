@@ -25,7 +25,7 @@ export const ViewStudentPage = () => {
       setStudent(studentData);
       await fetchFees(id);
       const data = await getAttendance(id);
-      console.log(data)
+      (data)
     };
     fetchData();
   }, [id]);
