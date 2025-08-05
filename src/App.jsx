@@ -23,6 +23,7 @@ import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
 import TeachersPage from './pages/TeachersPage';
 import './styles/Report.css';
 import { StaffAttendance } from './components/teachers/StaffAttendance';
+import CertificationResultsPage from './pages/CertificationResultsPage';
 
 
 
@@ -58,6 +59,7 @@ function App() {
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="teachers" element={<TeachersPage />} />
                     <Route path="teachers" element={StaffAttendance} />
+                    <Route path="certificates-results" element={<CertificationResultsPage/>}/>
                   </Route>
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
