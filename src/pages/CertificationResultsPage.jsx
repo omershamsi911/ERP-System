@@ -61,6 +61,17 @@ const CertificationResultsPage = () => {
     template: '',
     fields: []
   });
+  
+  // New state for class/section grouping and exam results
+  const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [examTypes, setExamTypes] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
+  const [selectedExamType, setSelectedExamType] = useState('');
+  const [examResults, setExamResults] = useState([]);
+  const [classStudents, setClassStudents] = useState([]);
+  const [classSubjects, setClassSubjects] = useState([]);
 
   // Certificate types
   const certificateTypes = [
@@ -89,7 +100,7 @@ const CertificationResultsPage = () => {
         // Fetch students
         const { data: studentData } = await supabase
           .from('students')
-          .select('id, fullname, class, gr_number, dob, admission_date');
+          .select('id, fullname, class, section, gr_number, dob, admission_date');
         
         // Fetch exams
         const { data: examData } = await supabase
@@ -101,10 +112,39 @@ const CertificationResultsPage = () => {
           .from('quiz')
           .select('id, date, subject, rubric');
         
+        // Fetch classes and sections
+        const { data: classData } = await supabase
+          .from('classes')
+          .select('id, name')
+          .order('name');
+        
+        const { data: sectionData } = await supabase
+          .from('sections')
+          .select('id, name')
+          .order('name');
+        
+        const examTypes = [...new Set(examData?.map(exam => exam.exam_type))].map(type => ({
+          id: type,
+          name: type.charAt(0).toUpperCase() + type.slice(1) // Capitalize first letter
+        }));
+
+        setExamTypes(examTypes);
+
+        console.log(examTypes);
+        
         setCertificates(certData || []);
         setStudents(studentData || []);
         setExams(examData || []);
         setQuizzes(quizData || []);
+        setClasses(classData || []);
+        setSections(sectionData || []);
+        
+        if (classData && classData.length > 0) {
+          setSelectedClass(classData[0].id);
+        }
+        if (sectionData && sectionData.length > 0) {
+          setSelectedSection(sectionData[0].id);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -114,6 +154,77 @@ const CertificationResultsPage = () => {
     
     fetchData();
   }, []);
+
+  // Fetch exam results when class, section or exam type changes
+  useEffect(() => {
+  const fetchExamResults = async () => {
+    if (!selectedClass || !selectedSection || !selectedExamType) return;
+
+    try {
+      setLoading(true);
+
+      // Fetch exams with student data joined
+      const { data: resultsData, error } = await supabase
+        .from('exams')
+        .select(`
+          id,
+          student_id,
+          subject,
+          marks_obtained,
+          total_marks,
+          grade,
+          exam_type,
+          students (
+            id,
+            fullname,
+            gr_number,
+            class,
+            section
+          )
+        `)
+        .eq('exam_type', selectedExamType);
+
+      if (error) {
+        console.error('Error fetching joined exam results:', error);
+        return;
+      }
+
+      // Filter results by selected class and section
+      const filteredResults = (resultsData || []).filter(result => {
+        return (
+          result.students?.class === selectedClass &&
+          result.students?.section === selectedSection
+        );
+      });
+
+      // Extract unique students and subjects
+      const studentsMap = new Map();
+      const subjectsSet = new Set();
+
+      filteredResults.forEach(result => {
+        const student = result.students;
+        if (student && !studentsMap.has(student.id)) {
+          studentsMap.set(student.id, {
+            id: student.id,
+            fullname: student.fullname,
+            gr_number: student.gr_number
+          });
+        }
+        subjectsSet.add(result.subject);
+      });
+
+      setClassStudents(Array.from(studentsMap.values()));
+      setExamResults(filteredResults);
+      setClassSubjects(Array.from(subjectsSet));
+    } catch (error) {
+      console.error('Error processing exam results:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchExamResults();
+}, [selectedClass, selectedSection, selectedExamType]);
 
   // Handle certificate creation/update
   const handleSaveCertificate = async () => {
@@ -187,61 +298,97 @@ const CertificationResultsPage = () => {
     );
   };
 
-  // Generate result for selected student and exam
-  const generateResult = () => {
-    if (!selectedStudent || !selectedExam) return null;
-    
-    const student = students.find(s => s.id === selectedStudent);
-    const exam = exams.find(e => e.id === selectedExam);
-    
-    if (!student || !exam) return null;
+  // Generate results for entire class
+  const generateClassResults = () => {
+  if (!selectedClass || !selectedSection || !selectedExamType) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        Please select class, section, and exam type
+      </div>
+    );
+  }
+
+  if (loading) {
+    return <div className="text-center py-8">Loading results...</div>;
+  }
+
+  if (classStudents.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No students found in the selected class/section
+      </div>
+    );
+  }
+
+  if (examResults.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No results found for the selected exam type
+      </div>
+    );
+  }
+
+  const selectedClassObj = classes.find(c => c.id === selectedClass);
+  const selectedSectionObj = sections.find(s => s.id === selectedSection);
+  const selectedExamTypeObj = examTypes.find(e => e.id === selectedExamType);
     
     return (
       <div className="border border-gray-200 p-6 bg-white printable">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold">{exam.name}</h2>
-          <p className="text-gray-600">Result Sheet</p>
+          <h2 className="text-2xl font-bold">Class Results</h2>
+          <p className="text-gray-600">
+            {selectedClassObj?.name || 'Class'} - {selectedSectionObj?.name || 'Section'} | 
+            {selectedExamTypeObj?.name || 'Exam Type'}
+          </p>
         </div>
         
-        <div className="mb-6">
-          <div className="flex justify-between mb-2">
-            <span className="font-medium">Student Name:</span>
-            <span>{student.fullname}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-            <span className="font-medium">Class:</span>
-            <span>{student.class}</span>
-          </div>
-          <div className="flex justify-between mb-2">
-            <span className="font-medium">GR Number:</span>
-            <span>{student.gr_number}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="font-medium">Exam Date:</span>
-            <span>{new Date(exam.exam_date).toLocaleDateString()}</span>
-          </div>
-        </div>
-        
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-2 border text-left">Subject</th>
-              <th className="p-2 border text-center">Marks</th>
-              <th className="p-2 border text-center">Grade</th>
-              <th className="p-2 border text-center">Remarks</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exam.subjects?.map((subject, index) => (
-              <tr key={index}>
-                <td className="p-2 border">{subject.name}</td>
-                <td className="p-2 border text-center">-</td>
-                <td className="p-2 border text-center">-</td>
-                <td className="p-2 border text-center">-</td>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-2 border text-left">Student</th>
+                <th className="p-2 border text-left">GR Number</th>
+                {classSubjects.map((subject, index) => (
+                  <React.Fragment key={index}>
+                    <th className="p-2 border text-center">{subject}</th>
+                    <th className="p-2 border text-center">Grade</th>
+                    <th className="p-2 border text-center">Remarks</th>
+                  </React.Fragment>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {classStudents.map(student => {
+                const studentResults = examResults.filter(r => r.student_id === student.id);
+                
+                return (
+                  <tr key={student.id}>
+                    <td className="p-2 border">{student.fullname}</td>
+                    <td className="p-2 border">{student.gr_number}</td>
+                    
+                    {classSubjects.map((subject, index) => {
+                      const result = studentResults.find(r => r.subject === subject);
+                      
+                      return (
+                        <React.Fragment key={index}>
+                          <td className="p-2 border text-center">
+                            {result ? `${result.marks_obtained}/${result.total_marks}` : '-'}
+                          </td>
+                          <td className="p-2 border text-center">
+                            {result?.grade || '-'}
+                          </td>
+                          <td className="p-2 border text-center">
+                            {result?.remarks || '-'}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         
         <div className="mt-6 flex justify-between">
           <div>
@@ -272,6 +419,9 @@ const CertificationResultsPage = () => {
             @page { size: A4; margin: 10mm; }
             .no-print { display: none; }
           }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
         </style>
       </head>
       <body>
@@ -417,48 +567,57 @@ const CertificationResultsPage = () => {
       ) : (
         <div className="space-y-6">
           <Card>
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Generate Result</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Generate Class Results</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Student</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
                 <select
-                  value={selectedStudent}
-                  onChange={(e) => setSelectedStudent(e.target.value)}
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">Select a student</option>
-                  {students.map(student => (
-                    <option key={student.id} value={student.id}>
-                      {student.fullname} (Class: {student.class}, GR#: {student.gr_number})
-                    </option>
+                  <option value="">Select a class</option>
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Section</label>
                 <select
-                  value={selectedExam}
-                  onChange={(e) => setSelectedExam(e.target.value)}
+                  value={selectedSection}
+                  onChange={(e) => setSelectedSection(e.target.value)}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
-                  <option value="">Select an exam</option>
-                  {exams.map(exam => (
-                    <option key={exam.id} value={exam.id}>
-                      {exam.name} ({new Date(exam.exam_date).toLocaleDateString()})
-                    </option>
+                  <option value="">Select a section</option>
+                  {sections.map(sec => (
+                    <option key={sec.id} value={sec.id}>{sec.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam Type</label>
+                <select
+                  value={selectedExamType}
+                  onChange={(e) => setSelectedExamType(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select an exam type</option>
+                  {examTypes.map(exam => (
+                    <option key={exam.id} value={exam.id}>{exam.name}</option>
                   ))}
                 </select>
               </div>
             </div>
             
-            {generateResult()}
+            {generateClassResults()}
             
             <div className="mt-4 flex justify-end space-x-3">
               <Button variant="secondary">
                 <Download size={18} className="mr-2" /> Download
               </Button>
               <Button onClick={handlePrint}>
-                <Printer size={18} className="mr-2" /> Print Result
+                <Printer size={18} className="mr-2" /> Print Results
               </Button>
             </div>
           </Card>
