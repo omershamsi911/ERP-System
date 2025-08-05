@@ -167,38 +167,56 @@ export const Trash2 = ({ className = '', ...props }) => (
 
 export default function TermDetailsManager() {
   const [terms, setTerms] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [selectedTermId, setSelectedTermId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [details, setDetails] = useState([]);
   const [currentDetail, setCurrentDetail] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTerms = async () => {
+    const fetchInitialData = async () => {
       setIsLoading(true);
-      const { data, error } = await supabase
+      
+      // Fetch terms
+      const { data: termsData, error: termsError } = await supabase
         .from('terms')
         .select('id, name')
         .order('start_date', { ascending: true });
       
-      if (error) console.error('Error fetching terms:', error);
-      else setTerms(data || []);
+      if (termsError) console.error('Error fetching terms:', termsError);
+      else setTerms(termsData || []);
       
-      if (data && data.length > 0) {
-        setSelectedTermId(data[0].id);
+      // Fetch classes
+      const { data: classesData, error: classesError } = await supabase
+        .from('classes')
+        .select('id, name')
+        .order('name', { ascending: true });
+      
+      if (classesError) console.error('Error fetching classes:', classesError);
+      else setClasses(classesData || []);
+      
+      if (termsData && termsData.length > 0) {
+        setSelectedTermId(termsData[0].id);
       }
+      if (classesData && classesData.length > 0) {
+        setSelectedClassId(classesData[0].id);
+      }
+      
       setIsLoading(false);
     };
-    fetchTerms();
+    fetchInitialData();
   }, []);
 
   const fetchDetails = useCallback(async () => {
-    if (!selectedTermId) return;
+    if (!selectedTermId || !selectedClassId) return;
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('term_details')
         .select('*')
         .eq('term_id', selectedTermId)
+        .eq('class_id', selectedClassId)
         .order('subject', { ascending: true });
       
       if (error) throw error;
@@ -207,7 +225,7 @@ export default function TermDetailsManager() {
       console.error('Error fetching term details:', error.message);
     }
     setIsLoading(false);
-  }, [selectedTermId]);
+  }, [selectedTermId, selectedClassId]);
 
   useEffect(() => {
     fetchDetails();
@@ -219,6 +237,7 @@ export default function TermDetailsManager() {
     const detailData = {
       ...Object.fromEntries(formData.entries()),
       term_id: selectedTermId,
+      class_id: selectedClassId,
       exam_weightage: Number(formData.get('exam_weightage'))
     };
 
@@ -262,7 +281,7 @@ export default function TermDetailsManager() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select
           label="Select Term"
           id="term-select"
@@ -271,11 +290,19 @@ export default function TermDetailsManager() {
         >
           {terms.map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
         </Select>
+        <Select
+          label="Select Class"
+          id="class-select"
+          value={selectedClassId}
+          onChange={(e) => setSelectedClassId(e.target.value)}
+        >
+          {classes.map(cls => <option key={cls.id} value={cls.id}>{cls.name}</option>)}
+        </Select>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
           <Card>
-            <h2 className="text-xl font-bold mb-4">Subject Details for Term</h2>
+            <h2 className="text-xl font-bold mb-4">Subject Details for {classes.find(c => c.id === selectedClassId)?.name || 'Class'} - {terms.find(t => t.id === selectedTermId)?.name || 'Term'}</h2>
             <div className="space-y-3">
               {details.map(detail => (
                 <div key={detail.id} className="p-3 bg-gray-50 rounded-lg">
