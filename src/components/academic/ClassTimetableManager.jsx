@@ -163,7 +163,7 @@ export const Trash2 = ({ className = '', ...props }) => (
     <line x1="14" x2="14" y1="11" y2="17" />
   </svg>
 );
-gu
+
 export default function ClassTimetableManager() {
   const [timetable, setTimetable] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
