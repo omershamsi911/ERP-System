@@ -163,24 +163,66 @@ export const Trash2 = ({ className = '', ...props }) => (
     <line x1="14" x2="14" y1="11" y2="17" />
   </svg>
 );
-
-
+gu
 export default function ClassTimetableManager() {
   const [timetable, setTimetable] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentEntry, setCurrentEntry] = useState(null);
   const [classes, setClasses] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedSection, setSelectedSection] = useState('');
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const periods = [1, 2, 3, 4, 5, 6, 7, 8];
 
+  const fetchClasses = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('classes')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setClasses(data || []);
+      
+      if (data && data.length > 0) {
+        setSelectedClass(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching classes:', error.message);
+    }
+  }, []);
+
+  const fetchSections = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sections')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      setSections(data || []);
+      
+      if (data && data.length > 0) {
+        setSelectedSection(data[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching sections:', error.message);
+    }
+  }, []);
+
   const fetchTimetable = useCallback(async () => {
+    if (!selectedClass || !selectedSection) return;
+    
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('class_timetables')
         .select('*')
+        .eq('class_id', selectedClass)
+        .eq('section_id', selectedSection)
         .order('day_of_the_week')
         .order('period');
       
@@ -190,44 +232,26 @@ export default function ClassTimetableManager() {
       console.error('Error fetching timetable:', error.message);
     }
     setIsLoading(false);
-  }, []);
+  }, [selectedClass, selectedSection]);
 
-  const fetchClasses = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('class_timetables')
-        .select('class, section')
-        .order('class')
-        .order('section');
-      
-      if (error) throw error;
-      
-      // Get unique classes
-      const uniqueClasses = [...new Set(
-        data.map(item => `${item.class}-${item.section}`)
-      )].map(item => {
-        const [classValue, section] = item.split('-');
-        return { class: classValue, section };
-      });
-      
-      setClasses(uniqueClasses);
-    } catch (error) {
-      console.error('Error fetching classes:', error.message);
-    }
-  }, []);
+  useEffect(() => {
+    fetchClasses();
+    fetchSections();
+  }, [fetchClasses, fetchSections]);
 
   useEffect(() => {
     fetchTimetable();
-    fetchClasses();
-  }, [fetchTimetable, fetchClasses]);
+  }, [fetchTimetable]);
 
   const handleSave = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    const entryData = Object.fromEntries(formData.entries());
-    entryData.period = Number(entryData.period);
-    entryData.class_id = Number(entryData.class);
-    entryData.section_id = 1; // Hardcoded as per schema requirement
+    const entryData = {
+      ...Object.fromEntries(formData.entries()),
+      class_id: selectedClass,
+      section_id: selectedSection,
+      period: Number(formData.get('period'))
+    };
 
     try {
       if (currentEntry && currentEntry.id) {
@@ -239,7 +263,7 @@ export default function ClassTimetableManager() {
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('class_timetable')
+          .from('class_timetables')
           .insert([entryData]);
         
         if (error) throw error;
@@ -282,15 +306,36 @@ export default function ClassTimetableManager() {
         </Button>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Select 
+          label="Select Class" 
+          value={selectedClass} 
+          onChange={(e) => setSelectedClass(e.target.value)}
+        >
+          {classes.map(cls => (
+            <option key={cls.id} value={cls.id}>{cls.name}</option>
+          ))}
+        </Select>
+        <Select 
+          label="Select Section" 
+          value={selectedSection} 
+          onChange={(e) => setSelectedSection(e.target.value)}
+        >
+          {sections.map(sec => (
+            <option key={sec.id} value={sec.id}>{sec.name}</option>
+          ))}
+        </Select>
+      </div>
+
       {isEditing && (
         <Card className="mb-8">
-          <h3 className="text-xl font-bold mb-4">{currentEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}</h3>
+          <h3 className="text-xl font-bold mb-4">
+            {currentEntry ? 'Edit Timetable Entry' : 'Add New Timetable Entry'}
+            <span className="block text-sm font-normal text-gray-600">
+              For {classes.find(c => c.id === selectedClass)?.name || 'Class'} - {sections.find(s => s.id === selectedSection)?.name || 'Section'}
+            </span>
+          </h3>
           <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <Select label="Class" name="class" defaultValue={currentEntry?.class || ''} required>
-              {classes.map((cls, idx) => (
-                <option key={idx} value={cls.class}>{cls.class} - {cls.section}</option>
-              ))}
-            </Select>
             <Select label="Day of Week" name="day_of_the_week" defaultValue={currentEntry?.day_of_the_week || ''} required>
               {daysOfWeek.map(day => <option key={day} value={day}>{day}</option>)}
             </Select>
@@ -309,6 +354,11 @@ export default function ClassTimetableManager() {
       )}
 
       <Card>
+        <div className="mb-4">
+          <h3 className="text-lg font-bold">
+            Timetable for {classes.find(c => c.id === selectedClass)?.name || 'Class'} - {sections.find(s => s.id === selectedSection)?.name || 'Section'}
+          </h3>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 border">
             <thead className="bg-gray-50">
