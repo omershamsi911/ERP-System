@@ -94,12 +94,12 @@ const CertificationResultsPage = () => {
         // Fetch exams
         const { data: examData } = await supabase
           .from('exams')
-          .select('id, name, exam_date, exam_type, subjects');
+          .select('id, date, exam_type, subject');
         
         // Fetch quizzes
         const { data: quizData } = await supabase
-          .from('quizzes')
-          .select('id, title, date, subject, max_marks');
+          .from('quiz')
+          .select('id, date, subject, rubric');
         
         setCertificates(certData || []);
         setStudents(studentData || []);
