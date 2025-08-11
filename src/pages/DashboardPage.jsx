@@ -778,7 +778,6 @@ const StudentPerformanceAnalytics = ({ students, fees, attendance, loading }) =>
           activeStudents: 0,
           feeCollection: 0,
           attendanceRate: 0,
-          performanceScore: 0
         };
       }
       
@@ -787,33 +786,35 @@ const StudentPerformanceAnalytics = ({ students, fees, attendance, loading }) =>
         classPerformance[className].activeStudents++;
       }
       
-      // Calculate fee collection rate for this class
-      const studentFees = fees.filter(fee => fee.studentId === student.id);
-      (fees[0].status)
+      // FIXED: Corrected fee filtering
+      const studentFees = fees.filter(fee => fee.student_id === student.id);
       const paidFees = studentFees.filter(fee => fee.status === 'paid');
       const feeRate = studentFees.length > 0 ? (paidFees.length / studentFees.length) * 100 : 0;
       classPerformance[className].feeCollection += feeRate;
       
-      ("main student ki attendance hoon", attendance)
-      // Calculate attendance rate for this student
+      // FIXED: Corrected attendance filtering and date field
       const studentAttendance = attendance.filter(record => 
-        record.studentId === student.id && 
-        moment(record.date).isAfter(moment().subtract(30, 'days'))
+        record.student_id === student.id && 
+        moment(record.attendance_date).isAfter(moment().subtract(30, 'days'))
       );
       const presentCount = studentAttendance.filter(record => record.status === 'present').length;
       const attendanceRate = studentAttendance.length > 0 ? (presentCount / studentAttendance.length) * 100 : 0;
       classPerformance[className].attendanceRate += attendanceRate;
     });
     
-    // Calculate averages
-    return Object.values(classPerformance).map(classData => ({
-      ...classData,
-      feeCollection: Math.round(classData.feeCollection / classData.totalStudents),
-      attendanceRate: Math.round(classData.attendanceRate / classData.totalStudents),
-      performanceScore: Math.round(
-        (classData.feeCollection + classData.attendanceRate) / (2 * classData.totalStudents)
-      )
-    }));
+    // Calculate averages and performance score
+    return Object.values(classPerformance).map(classData => {
+      const feeCollection = Math.round(classData.feeCollection / classData.totalStudents);
+      const attendanceRate = Math.round(classData.attendanceRate / classData.totalStudents);
+      
+      return {
+        ...classData,
+        feeCollection,
+        attendanceRate,
+        // FIXED: Correct performance score calculation
+        performanceScore: Math.round((feeCollection + attendanceRate) / 2)
+      };
+    });
   }, [students, fees, attendance]);
 
   if (loading) {
@@ -849,7 +850,6 @@ const StudentPerformanceAnalytics = ({ students, fees, attendance, loading }) =>
     </div>
   );
 };
-
 export const DashboardPage = () => {
   const [dashboardData, setDashboardData] = useState({
     students: [],
