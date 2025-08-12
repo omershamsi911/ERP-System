@@ -16,7 +16,7 @@ export const TeachersPage = () => {
     return <LoadingSpinner />;
   }
 
-  console.log(user);
+  (user);
 
   const isSubjectTeacher = hasRole('Subject Teacher');
   const isClassTeacher = hasRole('Class Teacher');

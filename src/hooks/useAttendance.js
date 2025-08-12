@@ -12,6 +12,7 @@ export const useAttendance = () => {
     try {
       const data = await attendanceService.getAttendance(filters);
       setAttendance(data);
+      return data;
     } catch (err) {
       setError(err.message || 'Failed to fetch attendance');
     } finally {

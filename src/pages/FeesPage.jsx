@@ -5,6 +5,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { useLocation } from 'react-router-dom';
 
 // Reusable Components
 const Card = ({ children, className = '' }) => (
@@ -215,6 +216,12 @@ const FeeManagement = () => {
     { id: 'memos', label: 'Memos & Vouchers' },
     { id: 'bulkvouchers', label: 'Voucher Generation'}
   ];
+
+  useEffect(() => {
+    if (location.hash === '#collection') {
+      setActiveTab("collection")
+    }
+  }, [location]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -537,7 +544,11 @@ const FeeCollectionTab = () => {
   const [isReceiptOpen, setIsReceiptOpen] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const location = useLocation()
   const [paymentNotes, setPaymentNotes] = useState('');
+  
+
+ 
 
   const searchStudents = async () => {
     if (!searchTerm.trim()) return;
