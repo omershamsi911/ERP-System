@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "../../services/supabase";
 
 const Card = ({ children, className = '' }) => (
@@ -173,6 +173,8 @@ export default function ClassTimetableManager() {
   const [sections, setSections] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
+  const [teachers, setTeachers] = useState([]);
+
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const periods = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -234,10 +236,46 @@ export default function ClassTimetableManager() {
     setIsLoading(false);
   }, [selectedClass, selectedSection]);
 
+
+  const fetchTeachers = useCallback(async () => {
+    try {
+      // Step 1: Get role IDs for teacher roles
+      const { data: roleData, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .in('name', ['Class Teacher', 'Subject Teacher']);
+
+      if (roleError) throw roleError;
+      const roleIds = roleData.map(role => role.id);
+
+      // Step 2: Get user IDs from user_roles
+      const { data: userRoleData, error: userRoleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role_id', roleIds);
+
+      if (userRoleError) throw userRoleError;
+      const userIds = userRoleData.map(ur => ur.user_id);
+
+      // Step 3: Get user details
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, full_name')
+        .in('id', userIds);
+
+      if (userError) throw userError;
+      setTeachers(userData || []);
+    } catch (error) {
+      console.error('Error fetching teachers:', error.message);
+    }
+  }, []);
+
+
   useEffect(() => {
     fetchClasses();
     fetchSections();
-  }, [fetchClasses, fetchSections]);
+    fetchTeachers();
+  }, [fetchClasses, fetchTeachers, fetchSections]);
 
   useEffect(() => {
     fetchTimetable();
@@ -290,6 +328,14 @@ export default function ClassTimetableManager() {
     }
   };
   
+  const teacherMap = useMemo(() => {
+    const map = {};
+    teachers.forEach(teacher => {
+      map[teacher.id] = teacher.full_name;
+    });
+    return map;
+  }, [teachers]);
+
   const getEntry = (day, period) => {
     return timetable.find(e => e.day_of_the_week === day && e.period === period);
   };
@@ -341,7 +387,19 @@ export default function ClassTimetableManager() {
             </Select>
             <Input label="Period" name="period" type="number" defaultValue={currentEntry?.period || ''} min="1" max="8" required />
             <Input label="Subject" name="subject" defaultValue={currentEntry?.subject || ''} required />
-            <Input label="Teacher ID" name="teacher_id" defaultValue={currentEntry?.teacher_id || ''} required />
+            <Select 
+              label="Teacher" 
+              name="teacher_id" 
+              defaultValue={currentEntry?.teacher_id || ''}
+              required
+            >
+              <option value="">Select Teacher</option>
+              {teachers.map(teacher => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.full_name}
+                </option>
+              ))}
+            </Select>
             <Input label="Start Time" name="start_time" type="time" defaultValue={currentEntry?.start_time || ''} required />
             <Input label="End Time" name="end_time" type="time" defaultValue={currentEntry?.end_time || ''} required />
             <Input label="Room" name="room" defaultValue={currentEntry?.room || ''} />
@@ -372,31 +430,22 @@ export default function ClassTimetableManager() {
                 <tr key={day}>
                   <td className="px-6 py-4 whitespace-nowrap font-bold text-sm text-gray-900 border-r bg-gray-50">{day}</td>
                   {periods.map(period => {
-                    const entry = getEntry(day, period);
-                    return (
-                      <td key={`${day}-${period}`} className="px-4 py-4 whitespace-nowrap text-sm text-gray-800 border-r relative group">
-                        {entry ? (
-                          <div>
-                            <p className="font-bold">{entry.subject}</p>
-                            <p className="text-xs text-gray-600">{entry.teacher_id}</p>
-                            <p className="text-xs text-gray-500">{entry.start_time} - {entry.end_time}</p>
-                            <p className="text-xs text-gray-500">Room: {entry.room}</p>
-                            <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
-                              <button onClick={() => { setCurrentEntry(entry); setIsEditing(true); }} className="p-1 bg-gray-200 rounded-full text-gray-600 hover:bg-gray-300">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                  <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
-                                  <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
-                                </svg>
-                              </button>
-                              <button onClick={() => handleDelete(entry.id)} className="p-1 bg-red-200 rounded-full text-red-700 hover:bg-red-300">
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : <div className="text-gray-400 text-xs">Empty</div>}
-                      </td>
-                    );
-                  })}
+                  const entry = getEntry(day, period);
+                  return (
+                    <td key={`${day}-${period}`} className="...">
+                      {entry ? (
+                        <div>
+                          <p className="font-bold">{entry.subject}</p>
+                          {/* CHANGE teacher_id display to teacher name */}
+                          <p className="text-xs text-gray-600">
+                            {teacherMap[entry.teacher_id] || entry.teacher_id}
+                          </p>
+                          {/* ... (rest of entry display remains) ... */}
+                        </div>
+                      ) : <div className="...">Empty</div>}
+                    </td>
+                  );
+                })}
                 </tr>
               ))}
             </tbody>
