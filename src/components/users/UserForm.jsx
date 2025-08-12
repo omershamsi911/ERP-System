@@ -3,6 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../services/supabase';
 import { useNotification } from '../../hooks/useNotification';
 import { LoadingSpinner } from '../shared/LoadingSpinner';
+import { authService } from '../../services/auth.service';
 
 const UserForm = ({ onUserCreated, initialUser = null }) => {
   const { user: currentUser } = useAuth();
@@ -12,8 +13,9 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     full_name: '',
-    role_id: '',
+    role: '',
     contact: ''
   });
   const [errors, setErrors] = useState({});
@@ -23,25 +25,21 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
       setFormData({
         email: initialUser.email || '',
         password: '',
+        confirmPassword: '',
         full_name: initialUser.full_name || '',
-        role_id: initialUser.role_id || '',
+        role: initialUser.role || '',
         contact: initialUser.contact || ''
       });
     }
-    fetchRoles();
+    loadRoles();
   }, [initialUser]);
 
-  const fetchRoles = async () => {
+  const loadRoles = async () => {
     try {
-      const { data, error } = await supabase
-        .from('roles')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setRoles(data);
+      const availableRoles = await authService.getRoles();
+      setRoles(availableRoles);
     } catch (error) {
-      console.error('Error fetching roles:', error);
+      console.error('Error loading roles:', error);
       showError('Failed to load roles');
     }
   };
@@ -55,18 +53,24 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
       newErrors.email = 'Please enter a valid email';
     }
 
-    if (!initialUser && !formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password && formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
+    if (!initialUser) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else if (formData.password.length < 6) {
+        newErrors.password = 'Password must be at least 6 characters';
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
     }
 
     if (!formData.full_name) {
       newErrors.full_name = 'Full name is required';
     }
 
-    if (!formData.role_id) {
-      newErrors.role_id = 'Role is required';
+    if (!formData.role) {
+      newErrors.role = 'Role is required';
     }
 
     setErrors(newErrors);
@@ -96,83 +100,41 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
     setLoading(true);
 
     try {
-      let result;
-      
       if (initialUser) {
         // Update existing user
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('users')
           .update({
             email: formData.email,
             full_name: formData.full_name,
-            contact: formData.contact
+            contact: formData.contact,
+            role: formData.role
           })
           .eq('id', initialUser.id);
 
         if (error) throw error;
-
-        // Update role if changed
-        if (formData.role_id !== initialUser.role_id) {
-          await updateUserRole(initialUser.id, formData.role_id);
-        }
-
-        result = data;
         showSuccess('User updated successfully');
       } else {
         // Create new user
-        const { user, error } = await supabase.auth.signUp(
-          { 
-            email: formData.email,
-            password: formData.password 
-          },
-          { 
-            data: {
-              full_name: formData.full_name,
-              contact: formData.contact,
-              created_by: currentUser.id
-            } 
-          }
-        );
+        const userData = {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+          contact: formData.contact,
+          role: formData.role
+        };
 
-        if (error) throw error;
-
-        // Assign role
-        await supabase
-          .from('user_roles')
-          .insert([{ 
-            user_id: user.id, 
-            role_id: formData.role_id,
-            assigned_by: currentUser.id 
-          }]);
-
-        result = user;
+        await authService.signup(userData);
         showSuccess('User created successfully');
       }
 
-      if (onUserCreated) onUserCreated(result);
+      if (onUserCreated) onUserCreated();
     } catch (error) {
       console.error('Error saving user:', error);
       showError(error.message || 'Failed to save user');
     } finally {
       setLoading(false);
     }
-  };
-
-  const updateUserRole = async (userId, roleId) => {
-    // First remove all existing roles
-    await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId);
-
-    // Then add the new role
-    await supabase
-      .from('user_roles')
-      .insert([{ 
-        user_id: userId, 
-        role_id: roleId,
-        assigned_by: currentUser.id 
-      }]);
   };
 
   return (
@@ -216,21 +178,39 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
           </div>
 
           {!initialUser && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password *
-              </label>
-              <input
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className={`w-full p-2 border rounded ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {errors.password && (
-                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-              )}
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`w-full p-2 border rounded ${errors.password ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {errors.password && (
+                  <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={`w-full p-2 border rounded ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+                )}
+              </div>
+            </>
           )}
 
           <div>
@@ -251,20 +231,20 @@ const UserForm = ({ onUserCreated, initialUser = null }) => {
               Role *
             </label>
             <select
-              name="role_id"
-              value={formData.role_id}
+              name="role"
+              value={formData.role}
               onChange={handleChange}
-              className={`w-full p-2 border rounded ${errors.role_id ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full p-2 border rounded ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
             >
               <option value="">Select a role</option>
               {roles.map(role => (
-                <option key={role.id} value={role.id}>
+                <option key={role.id} value={role.name}>
                   {role.name}
                 </option>
               ))}
             </select>
-            {errors.role_id && (
-              <p className="text-red-500 text-xs mt-1">{errors.role_id}</p>
+            {errors.role && (
+              <p className="text-red-500 text-xs mt-1">{errors.role}</p>
             )}
           </div>
         </div>

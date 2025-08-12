@@ -18,7 +18,7 @@ import { ViewStudentPage } from "./pages/ViewStudentPage";
 import { EditStudentPage } from "./pages/EditStudentPage";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import {LoginForm} from "./components/auth/LoginForm";
-import {SignupForm} from "./components/auth/SignupForm";
+// import {SignupForm} from "./components/auth/SignupForm";
 import {ProfileSettingsPage} from "./pages/ProfileSettingsPage";
 import TeachersPage from './pages/TeachersPage';
 import './styles/Report.css';
@@ -35,7 +35,7 @@ function App() {
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<LoginForm />} />
-            <Route path="/signup" element={<SignupForm />} />
+            {/* <Route path="/signup" element={<SignupForm />} /> */}
             {/* Protected Routes */}
             <Route path="/*" element={
               <ProtectedRoute>

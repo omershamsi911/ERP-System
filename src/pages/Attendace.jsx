@@ -57,6 +57,35 @@ const AttendancePage = () => {
     fetchClassesAndSections();
   }, []);
 
+
+  const goToPreviousDay = () => {
+  const prevDay = new Date(selectedDate);
+  prevDay.setDate(prevDay.getDate() - 1);
+  setSelectedDate(prevDay.toISOString().split('T')[0]);
+};
+
+const goToNextDay = () => {
+  const nextDay = new Date(selectedDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  setSelectedDate(nextDay.toISOString().split('T')[0]);
+};
+
+// Add keyboard event listener
+useEffect(() => {
+  const handleKeyDown = (e) => {
+    if (e.keyCode === 37) { // Left arrow key
+      goToPreviousDay();
+    } else if (e.keyCode === 39) { // Right arrow key
+      goToNextDay();
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown);
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown);
+  };
+}, [selectedDate]);
+
   // Fetch students and attendance data
   useEffect(() => {
     const fetchData = async () => {
@@ -323,21 +352,40 @@ const AttendancePage = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+     <div className="container mx-auto px-4 py-8">
       <div className="bg-white rounded-xl shadow-md p-6 mb-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-4">Student Attendance</h1>
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div className="flex flex-wrap gap-4">
-            <div className="w-full md:w-auto">
-              <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
-              <input
-                type="date"
-                id="date"
-                value={selectedDate}
-                onChange={handleDateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              />
+            {/* Updated Date Selector with Navigation Buttons */}
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={goToPreviousDay}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Previous day"
+              >
+                <ChevronDown className="transform rotate-90 w-5 h-5 text-gray-600" />
+              </button>
+              
+              <div className="w-full md:w-auto">
+                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">Select Date</label>
+                <input
+                  type="date"
+                  id="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              
+              <button 
+                onClick={goToNextDay}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                title="Next day"
+              >
+                <ChevronDown className="transform -rotate-90 w-5 h-5 text-gray-600" />
+              </button>
             </div>
             
             <div className="w-full md:w-auto">

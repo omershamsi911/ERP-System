@@ -202,7 +202,7 @@ const FeeCollectionChart = () => {
               borderRadius: '12px',
               boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
             }}
-            formatter={value => [`₹${value.toLocaleString()}`, '']}
+            formatter={value => [`Rs${value.toLocaleString()}`, '']}
           />
           <Area type="monotone" dataKey="collected" stackId="1" stroke="#10B981" fill="url(#collectedGradient)" name="Collected" />
           <Area type="monotone" dataKey="pending" stackId="1" stroke="#F59E0B" fill="url(#pendingGradient)" name="Pending" />
@@ -1209,7 +1209,7 @@ export const DashboardPage = () => {
                 <p className="text-gray-500 mt-1">Comprehensive performance metrics across all classes</p>
               </div>
               <Link
-                to="/performance"
+                to="/students"
                 className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-4 py-2 rounded-xl hover:from-yellow-600 hover:to-orange-600 transition-all duration-300 flex items-center space-x-2"
               >
                 <FiArrowUpRight />
@@ -1224,30 +1224,6 @@ export const DashboardPage = () => {
             />
           </div>
         </div>
-
-        {/* Real-time Alerts Banner */}
-        {(stats.overdueFees > 0 || stats.attendanceRate < 80) && (
-          <div className="mt-8">
-            <div className="bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-3xl shadow-xl p-6 border border-red-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FaExclamationTriangle className="text-3xl mr-4" />
-                  <div>
-                    <h3 className="text-xl font-bold">Attention Required</h3>
-                    <p className="text-red-100">
-                      {stats.overdueFees > 0 && `₹${stats.overdueFees} in overdue fees`}
-                      {stats.overdueFees > 0 && stats.attendanceRate < 80 && ' • '}
-                      {stats.attendanceRate < 80 && `Attendance rate below target (${stats.attendanceRate}%)`}
-                    </p>
-                  </div>
-                </div>
-                <button className="bg-white text-red-600 px-6 py-2 rounded-xl hover:bg-red-50 transition-colors font-semibold">
-                  Take Action
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
