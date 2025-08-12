@@ -3,6 +3,8 @@ import { Plus, Edit, Trash2, Search, ChevronDown, X, Printer, FileText, Download
 import { supabase } from '../services/supabase';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 // Reusable Components
 const Card = ({ children, className = '' }) => (
@@ -229,7 +231,7 @@ const FeeManagement = () => {
         {activeTab === 'structure' && <FeeStructure />}
         {activeTab === 'fines' && <FeeFines />}
         {activeTab === 'memos' && <MemoVoucherTab />}
-        {activeTab === 'bulkvouchers' && <BulkVoucherTab />}
+        {activeTab === 'bulkvouchers' && <BulkVoucherGenerator />}
       </div>
     </div>
   );
@@ -848,7 +850,8 @@ const FeeStructure = () => {
           fee_types (
             id,
             name,
-            fee_category_id
+            fee_type_id
+
           )
         `);
         
@@ -1451,438 +1454,486 @@ const MemoVoucherTab = () => {
   );
 };
 
-
-const BulkVoucherTab = () => {
+const BulkVoucherGenerator = () => {
   const [students, setStudents] = useState([]);
-  const [feeCategories, setFeeCategories] = useState([]);
   const [classFees, setClassFees] = useState([]);
-  const [selectedStudents, setSelectedStudents] = useState([]);
-  const [voucherTemplate, setVoucherTemplate] = useState({
-    fee_category_id: '',
-    due_date: '',
-    discount: 0,
-    fine: 0,
-    remarks: ''
-  });
-  const [loading, setLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [classes, setClasses] = useState([]);
-  const [sections, setSections] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('');
-  const [selectedSection, setSelectedSection] = useState('');
+  const [feeCategories, setFeeCategories] = useState([]);
+  const [dueDate, setDueDate] = useState(new Date());
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [fine, setFine] = useState(0);
+  const [selectedFeeCategory, setSelectedFeeCategory] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [classCoverage, setClassCoverage] = useState([]);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [debugMode, setDebugMode] = useState(false);
+  const [classMatching, setClassMatching] = useState([]);
+  const [feeMatching, setFeeMatching] = useState([]);
 
+  // Fetch all required data
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setMessage('');
+      setValidationErrors([]);
+      
       try {
-        setLoading(true);
-        
-        // Fetch students with filters
-        let studentsQuery = supabase
+        // Fetch active students
+        const { data: studentsData, error: studentsError } = await supabase
           .from('students')
-          .select('id, fullname, class, section, gr_number');
+          .select('id, fullname, class_id, class, section, status')
+          .eq('status', 'active');
         
-        if (selectedClass) studentsQuery = studentsQuery.eq('class', selectedClass);
-        if (selectedSection) studentsQuery = studentsQuery.eq('section', selectedSection);
-        
-        // Fetch unique classes and sections
-        const { data: classData } = await supabase
-          .from('students')
-          .select('class')
-          .not('class', 'is', null);
-        
-        const { data: sectionData } = await supabase
-          .from('students')
-          .select('section')
-          .not('section', 'is', null);
-        
-        // Fetch fee categories
-        const { data: feeCatData } = await supabase
-          .from('fee_categories')
-          .select('*');
+        if (studentsError) throw studentsError;
         
         // Fetch class fees
-        const { data: classFeesData } = await supabase
+        const { data: feesData, error: feesError } = await supabase
           .from('class_fees')
-          .select('*');
+          .select('id, class, fee_type_id, amount');
         
-        const [
-          { data: studentsData },
-          classDataRes,
-          sectionDataRes,
-          feeCatRes,
-          classFeesRes
-        ] = await Promise.all([
-          studentsQuery,
-          classData,
-          sectionData,
-          feeCatData,
-          classFeesData
-        ]);
+        if (feesError) throw feesError;
+        
+        // Fetch fee categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('fee_categories')
+          .select('id, name');
+        
+        if (categoriesError) throw categoriesError;
         
         setStudents(studentsData || []);
-        setClasses([...new Set(classDataRes.map(item => item.class))]);
-        setSections([...new Set(sectionDataRes.map(item => item.section))]);
-        setFeeCategories(feeCatRes || []);
-        setClassFees(classFeesRes || []);
+        setClassFees(feesData || []);
+        setFeeCategories(categoriesData || []);
+        
+        // Calculate class coverage
+        const coverage = calculateClassCoverage(studentsData, feesData);
+        setClassCoverage(coverage);
+        
+        // Debug: Show class matching
+        const matching = calculateClassMatching(studentsData, feesData);
+        setClassMatching(matching);
+        
+        // Debug: Show fee category matching
+        const feeMatch = calculateFeeMatching(feesData, categoriesData);
+        setFeeMatching(feeMatch);
+        
+        // Check for missing fee structures
+        const missingClasses = coverage.filter(c => c.hasFee === false);
+        if (missingClasses.length > 0) {
+          setValidationErrors([
+            `Warning: ${missingClasses.length} classes have no fee structure defined`,
+            ...missingClasses.map(c => `Class ${c.className} (${c.studentCount} students)`)
+          ]);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
+        setMessage(`Failed to load data: ${error.message}`);
       } finally {
         setLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [selectedClass, selectedSection]);
+  }, []);
 
-  // Handle student selection
-  const toggleStudentSelection = (studentId) => {
-    setSelectedStudents(prev => 
-      prev.includes(studentId)
-        ? prev.filter(id => id !== studentId)
-        : [...prev, studentId]
-    );
-  };
-
-  // Select all students
-  const selectAllStudents = () => {
-    setSelectedStudents(students.map(s => s.id));
-  };
-
-  // Clear all selections
-  const clearSelections = () => {
-    setSelectedStudents([]);
-  };
-
-  // Handle template changes
-  const handleTemplateChange = (e) => {
-    const { name, value } = e.target;
-    setVoucherTemplate(prev => ({
-      ...prev,
-      [name]: name.endsWith('_id') || name === 'discount' || name === 'fine' 
-        ? value
-        : value
-    }));
-  };
-
-  // Get class fee amount for a specific student
-  const getClassFeeAmount = (studentClass) => {
-    if (!voucherTemplate.fee_category_id) return 0;
+  // Calculate which classes have fee structures
+  const calculateClassCoverage = (students, fees) => {
+    const classMap = new Map();
     
-    const classFee = classFees.find(fee => 
-      fee.fee_category_id === voucherTemplate.fee_category_id && 
-      fee.class === studentClass
-    );
-    
-    return classFee ? classFee.amount : 0;
-  };
-
-  // Calculate final amount for a specific student
-  const calculateFinalAmount = (studentClass) => {
-    const baseAmount = getClassFeeAmount(studentClass);
-    return baseAmount - voucherTemplate.discount + voucherTemplate.fine;
-  };
-
-  // Calculate average final amount for summary
-  const calculateAverageAmount = () => {
-    if (selectedStudents.length === 0) return 0;
-    
-    const total = selectedStudents.reduce((sum, studentId) => {
-      const student = students.find(s => s.id === studentId);
-      return sum + calculateFinalAmount(student.class);
-    }, 0);
-    
-    return total / selectedStudents.length;
-  };
-
-  // Generate vouchers
-  const generateVouchers = async () => {
-    if (selectedStudents.length === 0) {
-      setStatusMessage('Please select at least one student');
-      return;
-    }
-
-    if (!voucherTemplate.fee_category_id || !voucherTemplate.due_date) {
-      setStatusMessage('Please complete all required fields');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const feeCategory = feeCategories.find(fc => fc.id === voucherTemplate.fee_category_id);
-      
-      if (!feeCategory) {
-        setStatusMessage('Invalid fee category');
-        return;
-      }
-      
-      const vouchers = [];
-      const errors = [];
-
-      for (const studentId of selectedStudents) {
-        const student = students.find(s => s.id === studentId);
-        if (!student) {
-          errors.push(`Student not found: ${studentId}`);
-          continue;
-        }
-        
-        const classFee = classFees.find(fee => 
-          fee.fee_category_id === voucherTemplate.fee_category_id && 
-          fee.class === student.class
-        );
-        
-        if (!classFee) {
-          errors.push(`No fee structure found for ${student.fullname} (Class ${student.class})`);
-          continue;
-        }
-        
-        const finalAmount = classFee.amount - voucherTemplate.discount + voucherTemplate.fine;
-        
-        vouchers.push({
-          student_id: studentId,
-          fee_type: feeCategory.name,
-          fee_category_id: voucherTemplate.fee_category_id,
-          class_fee_id: classFee.id,
-          total_amount: classFee.amount,
-          discount_amount: voucherTemplate.discount,
-          fine_amount: voucherTemplate.fine,
-          final_amount: finalAmount,
-          due_date: voucherTemplate.due_date,
-          status: 'unpaid',
-          remarks: voucherTemplate.remarks
+    // Group students by class
+    students.forEach(student => {
+      const classKey = student.class_id || student.class;
+      if (!classMap.has(classKey)) {
+        classMap.set(classKey, {
+          className: student.class,
+          studentCount: 0,
+          hasFee: false
         });
       }
+      classMap.get(classKey).studentCount++;
+    });
+    
+    // Check which classes have fees
+    fees.forEach(fee => {
+      const classKey = fee.class;
+      if (classMap.has(classKey)) {
+        classMap.get(classKey).hasFee = true;
+      }
+    });
+    
+    return Array.from(classMap.values());
+  };
+
+  // Debug: Show how classes match between tables
+  const calculateClassMatching = (students, fees) => {
+    const studentClasses = [...new Set(students.map(s => s.class))];
+    const feeClasses = [...new Set(fees.map(f => f.class))];
+    
+    return {
+      studentClasses,
+      feeClasses,
+      missingInFees: studentClasses.filter(sc => !feeClasses.includes(sc)),
+      missingInStudents: feeClasses.filter(fc => !studentClasses.includes(fc)),
+      matching: studentClasses.filter(sc => feeClasses.includes(sc))
+    };
+  };
+
+  // Debug: Show fee category matching
+  const calculateFeeMatching = (fees, categories) => {
+    const feeCategoryIds = [...new Set(fees.map(f => f.fee_type_id))];
+    const categoryIds = categories.map(c => c.id);
+    
+    return {
+      feeCategoryIds,
+      categoryIds,
+      missingCategories: feeCategoryIds.filter(id => !categoryIds.includes(id)),
+      extraCategories: categoryIds.filter(id => !feeCategoryIds.includes(id)),
+      matching: feeCategoryIds.filter(id => categoryIds.includes(id))
+    };
+  };
+
+  // Generate vouchers efficiently
+  const generateVouchers = async () => {
+    if (!selectedFeeCategory) {
+      setMessage('Please select a fee category');
+      return;
+    }
+
+    // Reset state
+    setIsGenerating(true);
+    setMessage('');
+    setProgress(0);
+    
+    try {
+      // Create fee map for quick lookup: {class: amount}
+      const feeMap = new Map();
+      classFees.forEach(fee => {
+        if (fee.fee_type_id === selectedFeeCategory) {
+          feeMap.set(fee.class, fee);
+        }
+      });
+
+      // Prepare all vouchers in memory
+      const vouchers = [];
+      const skippedStudents = [];
+      
+      students.forEach(student => {
+        const classKey = student.class_id || student.class;
+        const fee = feeMap.get(classKey);
+        
+        if (!fee) {
+          skippedStudents.push({
+            id: student.id,
+            name: student.fullname,
+            className: student.class
+          });
+          return;
+        }
+        
+        const finalAmount = fee.amount - discount + fine;
+        
+        vouchers.push({
+          student_id: student.id,
+          fee_type: feeCategories.find(c => c.id === selectedFeeCategory)?.name || 'Standard Fee',
+          fee_category_id: selectedFeeCategory,
+          class_fee_id: fee.id,
+          total_amount: fee.amount,
+          discount_amount: discount,
+          fine_amount: fine,
+          final_amount: finalAmount,
+          due_date: dueDate.toISOString(),
+          status: 'unpaid'
+        });
+      });
 
       if (vouchers.length === 0) {
-        setStatusMessage('No valid vouchers to generate. ' + errors.join('; '));
+        setMessage('No vouchers to generate - no matching fee structure found for any students');
         return;
       }
 
-      // Insert into database
-      const { error } = await supabase
-        .from('student_fees')
-        .insert(vouchers);
+      // Batch insert vouchers
+      const batchSize = 200;
+      const batchCount = Math.ceil(vouchers.length / batchSize);
       
-      if (error) throw error;
+      for (let i = 0; i < batchCount; i++) {
+        const batch = vouchers.slice(i * batchSize, (i + 1) * batchSize);
+        const { error } = await supabase.from('student_fees').insert(batch);
+        
+        if (error) throw error;
+        
+        setProgress(Math.floor(((i + 1) / batchCount) * 100));
+      }
+
+      let successMessage = `✅ Successfully generated ${vouchers.length} vouchers`;
+      if (skippedStudents.length > 0) {
+        successMessage += `\n⏩ ${skippedStudents.length} students skipped due to missing fee structure`;
+        successMessage += `\n📋 Affected classes: ${[...new Set(skippedStudents.map(s => s.className))].join(', ')}`;
+      }
       
-      setStatusMessage(`Successfully generated ${vouchers.length} vouchers. ${errors.length ? `Errors: ${errors.join('; ')}` : ''}`);
-      setSelectedStudents([]);
+      setMessage(successMessage);
     } catch (error) {
-      console.error('Error generating vouchers:', error);
-      setStatusMessage(`Error: ${error.message}`);
+      console.error('Voucher generation failed:', error);
+      setMessage(`❌ Failed to generate vouchers: ${error.message}`);
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
   return (
-    <Card>
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Bulk Voucher Generation</h2>
+    <div className="max-w-6xl mx-auto p-6 bg-white rounded-lg shadow-md">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-blue-700">Bulk Voucher Generator</h1>
+        <button 
+          onClick={() => setDebugMode(!debugMode)}
+          className="px-4 py-2 bg-gray-200 rounded-md text-sm"
+        >
+          {debugMode ? 'Hide Debug' : 'Show Debug'} Tools
+        </button>
+      </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Student Selection */}
-        <div className="student-selection">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Select Students</h3>
-            <div className="flex space-x-2">
-              <Button onClick={selectAllStudents} variant="secondary">
-                Select All
-              </Button>
-              <Button onClick={clearSelections} variant="secondary">
-                Clear
-              </Button>
-            </div>
-          </div>
+      {/* Debug Information */}
+      {debugMode && (
+        <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <h2 className="text-lg font-bold mb-3 text-yellow-700">Database Debug Information</h2>
           
-          {/* Filter Controls */}
-          <div className="flex flex-wrap gap-4 mb-4">
-            <div className="w-full md:w-auto">
-              <label htmlFor="class-filter" className="block text-sm font-medium text-gray-700 mb-1">Class</label>
-              <select
-                id="class-filter"
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Classes</option>
-                {classes.map((classItem) => (
-                  <option key={classItem} value={classItem}>
-                    {classItem}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="w-full md:w-auto">
-              <label htmlFor="section-filter" className="block text-sm font-medium text-gray-700 mb-1">Section</label>
-              <select
-                id="section-filter"
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Sections</option>
-                {sections.map((section) => (
-                  <option key={section} value={section}>
-                    {section}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 max-h-96 overflow-y-auto">
-            {loading ? (
-              <p className="text-center py-8">Loading students...</p>
-            ) : students.length === 0 ? (
-              <p className="text-center py-8 text-gray-500">No students found</p>
-            ) : (
-              <div className="space-y-2">
-                {students.map(student => (
-                  <div key={student.id} className="flex items-center p-2 hover:bg-gray-100 rounded">
-                    <input
-                      type="checkbox"
-                      checked={selectedStudents.includes(student.id)}
-                      onChange={() => toggleStudentSelection(student.id)}
-                      className="mr-3 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <div>
-                      <div className="font-medium">{student.fullname}</div>
-                      <div className="text-sm text-gray-500">
-                        {student.class} - {student.section} | GR: {student.gr_number}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <div className="mt-2 text-sm text-gray-600">
-            {selectedStudents.length} {selectedStudents.length === 1 ? 'student' : 'students'} selected
-          </div>
-        </div>
-        
-        {/* Voucher Template */}
-        <div className="voucher-template">
-          <h3 className="text-lg font-semibold mb-4">Voucher Template</h3>
-          
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Class Matching */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fee Category</label>
-              <select
-                name="fee_category_id"
-                value={voucherTemplate.fee_category_id}
-                onChange={handleTemplateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                required
-              >
-                <option value="">Select Category</option>
-                {feeCategories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name} - {cat.description}
-                  </option>
-                ))}
-              </select>
+              <h3 className="font-semibold mb-2">Class Matching Analysis</h3>
+              <div className="text-sm">
+                <p><span className="font-medium">Student Classes:</span> {classMatching.studentClasses?.join(', ') || 'None'}</p>
+                <p><span className="font-medium">Fee Classes:</span> {classMatching.feeClasses?.join(', ') || 'None'}</p>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-green-600">Matching Classes:</p>
+                  <p>{classMatching.matching?.join(', ') || 'None'}</p>
+                </div>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-red-600">Classes in Students but not in Fees:</p>
+                  <p>{classMatching.missingInFees?.join(', ') || 'None'}</p>
+                </div>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-blue-600">Classes in Fees but not in Students:</p>
+                  <p>{classMatching.missingInStudents?.join(', ') || 'None'}</p>
+                </div>
+              </div>
             </div>
             
+            {/* Fee Category Matching */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
-              <input
-                type="date"
-                name="due_date"
-                value={voucherTemplate.due_date}
-                onChange={handleTemplateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Discount (Rs.)</label>
-                <input
-                  type="number"
-                  name="discount"
-                  value={voucherTemplate.discount}
-                  onChange={handleTemplateChange}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fine (Rs.)</label>
-                <input
-                  type="number"
-                  name="fine"
-                  value={voucherTemplate.fine}
-                  onChange={handleTemplateChange}
-                  min="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
-              <textarea
-                name="remarks"
-                value={voucherTemplate.remarks}
-                onChange={handleTemplateChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                rows={2}
-              />
-            </div>
-            
-            {/* Fee Summary */}
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h4 className="font-medium text-gray-700 mb-3">Fee Summary</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Base Amount:</span>
-                  <span>Varies by class</span>
+              <h3 className="font-semibold mb-2">Fee Category Matching</h3>
+              <div className="text-sm">
+                <p><span className="font-medium">Fee Categories in Use:</span> {feeMatching.feeCategoryIds?.join(', ') || 'None'}</p>
+                <p><span className="font-medium">All Categories:</span> {feeMatching.categoryIds?.join(', ') || 'None'}</p>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-green-600">Matching Categories:</p>
+                  <p>{feeMatching.matching?.join(', ') || 'None'}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span>Discount:</span>
-                  <span className="text-green-600">- Rs. {voucherTemplate.discount || '0.00'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Fine:</span>
-                  <span className="text-red-600">+ Rs. {voucherTemplate.fine || '0.00'}</span>
-                </div>
-                <div className="flex justify-between border-t border-gray-200 pt-2 font-medium">
-                  <span>Average Final Amount:</span>
-                  <span>Rs. {calculateAverageAmount().toLocaleString(undefined, { minimumFractionDigits: 2 }) || '0.00'}</span>
+                
+                <div className="mt-3">
+                  <p className="font-medium text-red-600">Categories in Fees but not in Categories Table:</p>
+                  <p>{feeMatching.missingCategories?.join(', ') || 'None'}</p>
                 </div>
               </div>
             </div>
-            
-            <div className="pt-4">
-              <Button 
-                onClick={generateVouchers}
-                className="w-full flex justify-center"
-                disabled={loading || selectedStudents.length === 0}
-              >
-                {loading ? (
-                  <span>Generating Vouchers...</span>
-                ) : (
-                  <span>Generate {selectedStudents.length} Vouchers</span>
-                )}
-              </Button>
-              
-              {statusMessage && (
-                <div className={`mt-3 text-center text-sm p-2 rounded ${
-                  statusMessage.startsWith('Success') 
-                    ? 'bg-green-100 text-green-700' 
-                    : 'bg-red-100 text-red-700'
-                }`}>
-                  {statusMessage}
-                </div>
+          </div>
+          
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2">SQL Query to Fix Issues</h3>
+            <div className="bg-gray-800 text-white p-3 rounded text-sm font-mono overflow-x-auto">
+              {validationErrors.length > 0 ? (
+                <>
+                  <p>-- Add missing fee structures</p>
+                  {validationErrors.slice(1).map((err, idx) => {
+                    if (err.startsWith('Class')) {
+                      const className = err.split(' ')[1];
+                      return (
+                        <p key={idx}>
+                          INSERT INTO class_fees (class, fee_type_id, amount) <br />
+                          VALUES ('{className}', [FEE_CATEGORY_ID], 0); -- Set actual amount
+                        </p>
+                      );
+                    }
+                    return null;
+                  })}
+                </>
+              ) : (
+                <p>-- No structural issues detected</p>
               )}
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Configuration Section */}
+      <div className="bg-gray-50 p-5 rounded-lg mb-6 border border-gray-200">
+        <h2 className="text-xl font-semibold mb-4">Voucher Configuration</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Fee Category Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fee Category *
+            </label>
+            <select
+              value={selectedFeeCategory}
+              onChange={(e) => setSelectedFeeCategory(e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              disabled={isGenerating}
+            >
+              <option value="">Select Fee Category</option>
+              {feeCategories.map(category => (
+                <option key={category.id} value={category.id}>
+                  {category.name} (ID: {category.id})
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Selected: {selectedFeeCategory ? 
+                feeCategories.find(c => c.id === selectedFeeCategory)?.name : 
+                'None'}
+            </p>
+          </div>
+          
+          {/* Due Date Picker */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Due Date *
+            </label>
+            <DatePicker
+              selected={dueDate}
+              onChange={setDueDate}
+              minDate={new Date()}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              disabled={isGenerating}
+            />
+          </div>
+          
+          {/* Discount Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Discount Amount
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={discount}
+              onChange={(e) => setDiscount(Math.max(0, Number(e.target.value)))}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              disabled={isGenerating}
+            />
+          </div>
+          
+          {/* Fine Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fine Amount
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={fine}
+              onChange={(e) => setFine(Math.max(0, Number(e.target.value)))}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              disabled={isGenerating}
+            />
+          </div>
+        </div>
       </div>
-    </Card>
+      
+      {/* Class Coverage Section */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-xl font-semibold">Class Fee Coverage</h2>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            classCoverage.filter(c => c.hasFee).length === classCoverage.length ?
+            'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {classCoverage.filter(c => c.hasFee).length} of {classCoverage.length} classes covered
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {classCoverage.map((classInfo, index) => (
+            <div 
+              key={index} 
+              className={`p-3 rounded-md border ${
+                classInfo.hasFee ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+              }`}
+            >
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Class {classInfo.className}</span>
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  classInfo.hasFee ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
+                }`}>
+                  {classInfo.hasFee ? 'Covered' : 'Missing'}
+                </span>
+              </div>
+              <div className="flex justify-between mt-2 text-sm">
+                <span>Students:</span>
+                <span className="font-medium">{classInfo.studentCount}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Generate Button */}
+      <div className="flex justify-center mt-8">
+        <button
+          onClick={generateVouchers}
+          disabled={isGenerating || !selectedFeeCategory}
+          className={`py-3 px-8 rounded-md font-medium text-white text-lg ${
+            isGenerating || !selectedFeeCategory
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700 shadow-md transform hover:scale-105 transition-transform'
+          }`}
+        >
+          {isGenerating ? (
+            <div className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Generating Vouchers...
+            </div>
+          ) : (
+            'Generate All Vouchers'
+          )}
+        </button>
+      </div>
+      
+      {/* Progress Bar */}
+      {isGenerating && (
+        <div className="mt-6">
+          <div className="w-full bg-gray-200 rounded-full h-3">
+            <div
+              className="bg-green-500 h-3 rounded-full"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between mt-1 text-sm text-gray-600">
+            <span>Generating vouchers...</span>
+            <span>{progress}% complete</span>
+          </div>
+        </div>
+      )}
+      
+      {/* Status Messages */}
+      {message && (
+        <div className={`mt-6 p-4 rounded-md ${
+          message.includes('✅') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        } whitespace-pre-line`}>
+          {message}
+        </div>
+      )}
+    </div>
   );
 };
+
+
 export default FeeManagement;
