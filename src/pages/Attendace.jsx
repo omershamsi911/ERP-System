@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, Clock, Edit, Trash2, Plus, ChevronDown, Search } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 const AttendancePage = () => {
+   const { hasPermission } = useAuth();
   const [students, setStudents] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -15,6 +17,18 @@ const AttendancePage = () => {
   const [sections, setSections] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSection, setSelectedSection] = useState('');
+
+
+
+
+
+
+
+    const canViewPage = hasPermission('manage_student_attendance_page');
+    const canAddManual = hasPermission('add_manual_attendance');
+    const canEdit = hasPermission('edit_attendance');
+    const canDelete = hasPermission('delete_attendance');
+
 
   // Form state
   const [formData, setFormData] = useState({
@@ -481,53 +495,61 @@ useEffect(() => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {student.class}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="flex justify-center space-x-2">
+                     
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="flex justify-center space-x-2">
+                      <button
+                        onClick={() => handleStatusChange(student.id, 'present')}
+                        disabled={!canEdit}
+                        className={`px-3 py-1 rounded-md text-sm ${status === 'present' ? 'bg-green-100 text-green-800 font-medium' : 'text-gray-500 hover:bg-gray-100'} ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Check className="inline mr-1" size={16} /> Present
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(student.id, 'absent')}
+                        disabled={!canEdit}
+                        className={`px-3 py-1 rounded-md text-sm ${status === 'absent' ? 'bg-red-100 text-red-800 font-medium' : 'text-gray-500 hover:bg-gray-100'} ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <X className="inline mr-1" size={16} /> Absent
+                      </button>
+                    </div>
+                  </td>
+                       <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {status && canEdit && (
+                      <select
+                        value={remarks || 'ontime'}
+                        onChange={(e) => handleRemarksChange(record.id, e.target.value)}
+                        className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                      >
+                        <option value="ontime">On Time</option>
+                        <option value="late">Late</option>
+                        <option value="leave">Leave</option>
+                      </select>
+                    )}
+                  </td>
+                  
+                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    {record && (canEdit || canDelete) && (
+                      <div className="flex justify-end space-x-2">
+                        {canEdit && (
                           <button
-                            onClick={() => handleStatusChange(student.id, 'present')}
-                            className={`px-3 py-1 rounded-md text-sm ${status === 'present' ? 'bg-green-100 text-green-800 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}
+                            onClick={() => openEditModal(record)}
+                            className="text-blue-600 hover:text-blue-900"
                           >
-                            <Check className="inline mr-1" size={16} /> Present
+                            <Edit size={18} />
                           </button>
+                        )}
+                        {canDelete && (
                           <button
-                            onClick={() => handleStatusChange(student.id, 'absent')}
-                            className={`px-3 py-1 rounded-md text-sm ${status === 'absent' ? 'bg-red-100 text-red-800 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}
+                            onClick={() => handleDelete(record.id)}
+                            className="text-red-600 hover:text-red-900"
                           >
-                            <X className="inline mr-1" size={16} /> Absent
+                            <Trash2 size={18} />
                           </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {status && (
-                          <select
-                            value={remarks || 'ontime'}
-                            onChange={(e) => handleRemarksChange(record.id, e.target.value)}
-                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                          >
-                            <option value="ontime">On Time</option>
-                            <option value="late">Late</option>
-                            <option value="leave">Leave</option>
-                          </select>
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {record && (
-                          <div className="flex justify-end space-x-2">
-                            <button
-                              onClick={() => openEditModal(record)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              <Edit size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(record.id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        )}
-                      </td>
+                      </div>
+                    )}
+                  </td>
                     </tr>
                   );
                 })
@@ -567,6 +589,15 @@ useEffect(() => {
           </div>
         </div>
       </div>
+       {canAddManual && (
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+        >
+          <Plus className="mr-2" size={18} />
+          Add Manual Entry
+        </button>
+      )}
       
       <div className={`fixed inset-0 backdrop-blur-sm z-50 flex items-center justify-center ${isModalOpen ? 'block' : 'hidden'}`}>
   <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">

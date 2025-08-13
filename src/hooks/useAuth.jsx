@@ -66,22 +66,48 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const hasPermission = (requiredPermission) => {
+ const hasPermission = (requiredPermission) => {
     if (!requiredPermission) return true;
     if (!user || !user.roles) return false;
     
     // Super Admin has all permissions
     if (user.roles.includes('Super Admin')) return true;
     
-    // Map permissions to roles (you can expand this)
+    // Map permissions to roles
     const rolePermissions = {
-      'Principal': ['manage_users', 'view_students', 'edit_students', 'manage_fees', 'view_fees', 'manage_attendance', 'view_attendance', 'manage_academic', 'view_reports', 'manage_settings'],
-      'Accountant': ['view_students', 'manage_fees', 'view_fees', 'view_reports'],
-      'Teacher': ['view_students', 'view_attendance', 'view_reports'],
-      'Receptionist': ['view_students', 'edit_students', 'view_fees', 'view_attendance']
+      'Principal': [
+        'manage_users', 'view_students', 'edit_students', 'manage_fees', 
+        'view_fees', 'manage_attendance', 'view_attendance', 'manage_academic', 
+        'view_reports', 'manage_settings', 'access_teacher_dashboard',
+        'input_marks', 'manage_rechecking', 'manage_student_attendance',
+        'view_student_progress', 'manage_own_attendance',
+        'manage_student_attendance_page', 'view_student_details'
+      ],
+      'Accountant': [
+        'view_students', 'manage_fees', 'view_fees', 'view_reports'
+      ],
+      'Class Teacher': [
+        'view_students', 'view_attendance', 'view_reports', 
+        'access_teacher_dashboard', 'input_marks', 'manage_rechecking',
+        'manage_own_attendance', 'manage_student_attendance', 
+        'view_student_progress', 'manage_student_attendance_page'
+      ],
+      'Subject Teacher': [
+        'view_students', 'view_attendance', 'view_reports', 
+        'access_teacher_dashboard', 'input_marks', 'manage_rechecking',
+        'manage_own_attendance'
+      ],
+      'Receptionist': [
+        'view_students', 'edit_students', 'view_fees', 'view_attendance',
+        'view_student_details'
+      ]
     };
 
-    const userPermissions = user.roles.flatMap(role => rolePermissions[role] || []);
+    // Collect permissions from all user roles
+    const userPermissions = user.roles.reduce((permissions, role) => {
+      return [...permissions, ...(rolePermissions[role] || [])];
+    }, []);
+
     return userPermissions.includes(requiredPermission);
   };
 

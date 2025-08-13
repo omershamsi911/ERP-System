@@ -8,41 +8,62 @@ import { StaffAttendance } from '../components/teachers/StaffAttendance';
 import { RecheckingSchedule } from '../components/teachers/RecheckingSchedule';
 
 export const TeachersPage = () => {
-  const { user, hasRole } = useAuth();
+  const { user, hasPermission } = useAuth(); // Use hasPermission instead of hasRole
   const [activeTab, setActiveTab] = useState('marks');
   const [loading, setLoading] = useState(false);
+
+  // Check if user has permission to access this page
+  const canAccessTeachersPage = hasPermission('access_teacher_dashboard');
 
   if (!user) {
     return <LoadingSpinner />;
   }
 
-  (user);
+  // Block access if user doesn't have required permission
+  if (!canAccessTeachersPage) {
+    return (
+      <div className="container mx-auto p-6">
+        <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+        <p className="text-gray-700">
+          You don't have permission to view this page. Please contact your administrator.
+        </p>
+      </div>
+    );
+  }
 
-  const isSubjectTeacher = hasRole('Subject Teacher');
-  const isClassTeacher = hasRole('Class Teacher');
-  const isSuperAdmin = hasRole('Super Admin');
+  // Define tab permissions
+  const TAB_PERMISSIONS = {
+    marks: 'input_marks',
+    rechecking: 'manage_rechecking',
+    attendance: 'manage_student_attendance',
+    progress: 'view_student_progress',
+    'staff-attendance': 'manage_own_attendance'
+  };
 
-  // Determine available tabs based on role
+  // Get available tabs based on permissions
   const getAvailableTabs = () => {
-    const tabs = [
-      { id: 'marks', label: 'Input Marks', icon: '📝' },
-      { id: 'rechecking', label: 'Rechecking Schedule', icon: '📋' },
-      { id: 'staff-attendance', label: 'My Attendance', icon: '⏰' }
-    ];
-
-    if (isClassTeacher || isSuperAdmin) {
-      tabs.push(
-        { id: 'attendance', label: 'Student Attendance', icon: '👥' },
-        { id: 'progress', label: 'Student Progress', icon: '📊' }
-      );
-    }
-
-    return tabs;
+    return [
+      { id: 'marks', label: 'Input Marks', icon: '📝', permission: TAB_PERMISSIONS.marks },
+      { id: 'rechecking', label: 'Rechecking Schedule', icon: '📋', permission: TAB_PERMISSIONS.rechecking },
+      { id: 'staff-attendance', label: 'My Attendance', icon: '⏰', permission: TAB_PERMISSIONS['staff-attendance'] },
+      { id: 'attendance', label: 'Student Attendance', icon: '👥', permission: TAB_PERMISSIONS.attendance },
+      { id: 'progress', label: 'Student Progress', icon: '📊', permission: TAB_PERMISSIONS.progress },
+    ]
   };
 
   const availableTabs = getAvailableTabs();
 
   const renderTabContent = () => {
+    // Additional permission check for current tab
+    if (!hasPermission(TAB_PERMISSIONS[activeTab])) {
+      return (
+        <div className="text-center py-12">
+          <h3 className="text-xl font-semibold text-red-600 mb-2">Access Restricted</h3>
+          <p>You don't have permission to view this section.</p>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'marks':
         return <InputMarks />;
@@ -65,19 +86,14 @@ export const TeachersPage = () => {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Teacher Dashboard
         </h1>
-        <p className="text-gray-600">
-          Welcome back, {user.full_name}! 
-          {isSubjectTeacher && !isClassTeacher && " You are a Subject Teacher."}
-          {isClassTeacher && " You are a Class Teacher with additional responsibilities."}
-        </p>
+       
       </div>
 
       {/* Role Information */}
       <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <h3 className="font-semibold text-blue-900 mb-2">Your Roles:</h3>
         <div className="flex flex-wrap gap-2">
-          {
-          user.roles?.map(role => (
+          {user.roles?.map(role => (
             <span key={role} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
               {role}
             </span>
@@ -123,4 +139,4 @@ export const TeachersPage = () => {
   );
 };
 
-export default TeachersPage; 
+export default TeachersPage;

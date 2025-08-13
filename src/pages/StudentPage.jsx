@@ -13,9 +13,23 @@ export const StudentPage = () => {
   const { getStudentById, loading: studentLoading, error: studentError } = useStudents();
   const { getStudentFees, fees, loading: feesLoading, error: feesError } = useFees();
   const { getStudentAttendance, attendance, loading: attendanceLoading, error: attendanceError } = useAttendance();
+  const { hasPermission } = useAuth();
   
   const [student, setStudent] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Check permissions
+  const canViewStudent = hasPermission('view_student_details');
+  const canEditStudent = hasPermission('edit_student_details');
+  const canViewFees = hasPermission('view_student_fees');
+  const canManageFees = hasPermission('manage_student_fees');
+  const canViewAttendance = hasPermission('view_student_attendance');
+  const canViewAcademic = hasPermission('view_student_academic');
+
+  // Early return if no permission
+  if (!canViewStudent) {
+    return <AccessDenied requiredPermission="view_student_details" />;
+  }
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,8 +37,13 @@ export const StudentPage = () => {
         const studentData = await getStudentById(id);
         setStudent(studentData);
         
-        await getStudentFees(id);
-        await getStudentAttendance(id, null, null);
+        if (canViewFees) {
+          await getStudentFees(id);
+        }
+        
+        if (canViewAttendance) {
+          await getStudentAttendance(id, null, null);
+        }
       } catch (err) {
         console.error('Error fetching student data:', err);
       }
@@ -32,6 +51,7 @@ export const StudentPage = () => {
     
     fetchData();
   }, [id]);
+
 
   if (studentLoading) return <LoadingSpinner />;
   // if (studentError) return <ErrorAlert message={studentError} />;
@@ -104,6 +124,14 @@ export const StudentPage = () => {
               <span className="bg-pink-700 px-2 py-1 rounded text-xs">Father: {student.families?.father_name || 'N/A'}</span>
             </div>
           </div>
+          {canEditStudent && (
+          <Link 
+            to={`/students/edit/${student.id}`}
+            className="flex items-center bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md"
+          >
+            <FaEdit className="mr-2" /> Edit Profile
+          </Link>
+        )}
         </div>
         <Link 
           to={`/students/edit/${student.id}`}
@@ -113,7 +141,7 @@ export const StudentPage = () => {
         </Link>
       </div>
 
-      <div className="border-b border-gray-200">
+       <div className="border-b border-gray-200">
         <nav className="flex -mb-px">
           <button
             onClick={() => setActiveTab('overview')}
@@ -125,36 +153,45 @@ export const StudentPage = () => {
           >
             Overview
           </button>
-          <button
-            onClick={() => setActiveTab('fees')}
-            className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-              activeTab === 'fees'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Fees
-          </button>
-          <button
-            onClick={() => setActiveTab('attendance')}
-            className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-              activeTab === 'attendance'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Attendance
-          </button>
-          <button
-            onClick={() => setActiveTab('academic')}
-            className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
-              activeTab === 'academic'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Academic
-          </button>
+          
+          {canViewFees && (
+            <button
+              onClick={() => setActiveTab('fees')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'fees'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Fees
+            </button>
+          )}
+          
+          {canViewAttendance && (
+            <button
+              onClick={() => setActiveTab('attendance')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'attendance'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Attendance
+            </button>
+          )}
+          
+          {canViewAcademic && (
+            <button
+              onClick={() => setActiveTab('academic')}
+              className={`py-4 px-6 text-center border-b-2 font-medium text-sm ${
+                activeTab === 'academic'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Academic
+            </button>
+          )}
         </nav>
       </div>
 
@@ -230,9 +267,11 @@ export const StudentPage = () => {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Fee Records</h2>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
-                Add Fee
-              </button>
+              {canManageFees && (
+                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">
+                  Add Fee
+                </button>
+              )}
             </div>
             
             {feesLoading && <LoadingSpinner fullPage={false} />}
